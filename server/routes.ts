@@ -9,7 +9,7 @@ const anthropic = new Anthropic({
   baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
 });
 
-const H = `^#+\\s+(?:[^\\w\\n]*\\s*)?`;
+const H = `^#+\\s+(?:[^\\n]*?\\s)?`;
 const DOCUMENT_PATTERNS: { pattern: RegExp; docType: string; title: string }[] = [
   { pattern: new RegExp(`${H}product\\s+brief`, "im"), docType: "product-brief", title: "Product Brief" },
   { pattern: new RegExp(`${H}project\\s+brief`, "im"), docType: "product-brief", title: "Project Brief" },
@@ -18,8 +18,9 @@ const DOCUMENT_PATTERNS: { pattern: RegExp; docType: string; title: string }[] =
   { pattern: new RegExp(`${H}competitive\\s+analysis`, "im"), docType: "market-research", title: "Competitive Analysis" },
   { pattern: new RegExp(`${H}brainstorm`, "im"), docType: "brainstorm", title: "Brainstorm Summary" },
   { pattern: new RegExp(`${H}product\\s+requirements?\\s+document`, "im"), docType: "prd", title: "Product Requirements Document" },
-  { pattern: /^#+\s+(?:[^\w\n]*\s*)?PRD/m, docType: "prd", title: "Product Requirements Document" },
+  { pattern: /^#+\s+(?:[^\n]*?\s)?PRD/m, docType: "prd", title: "Product Requirements Document" },
   { pattern: new RegExp(`${H}ux\\s+design`, "im"), docType: "ux-design", title: "UX Design" },
+  { pattern: new RegExp(`${H}ux\\s+spec`, "im"), docType: "ux-design", title: "UX Specification" },
   { pattern: new RegExp(`${H}user\\s+experience`, "im"), docType: "ux-design", title: "UX Design" },
   { pattern: new RegExp(`${H}(?:technical\\s+|system\\s+)?architecture`, "im"), docType: "architecture", title: "Architecture Document" },
   { pattern: new RegExp(`${H}epic`, "im"), docType: "epic", title: "Epic" },
