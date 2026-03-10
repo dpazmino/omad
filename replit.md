@@ -33,6 +33,14 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
   - Import from CE (Create Epics) command output via `parseEpicsFromDocument()`
   - Component: `client/src/components/BoardView.tsx`
   - API: `/api/projects/:id/epics`, `/api/projects/:id/sprints`, `/api/projects/:id/stories`, `/api/projects/:id/import-epics`
+- **Dev View**: Focused screen for in-progress story development. Accessible from ProjectDetail "Dev View" link.
+  - Shows all in-progress stories with prompt status
+  - Per-story Claude Code prompt editor (saved to `stories.prompt` column)
+  - Aggregate prompts: combines selected stories' prompts into a single markdown document for Claude Code
+  - Duplicate story detection: word-overlap similarity analysis (>60% threshold)
+  - Merge duplicates: consolidates descriptions/acceptance criteria into primary story
+  - Page: `client/src/pages/DevView.tsx`
+  - API: `/api/projects/:id/aggregate-prompts`, `/api/projects/:id/duplicate-stories`, `/api/stories/merge`
 
 ## File Structure
 ```
@@ -42,6 +50,7 @@ client/src/
   pages/Workflows.tsx     - BMad workflow reference (global)
   pages/Projects.tsx      - Project listing dashboard
   pages/ProjectDetail.tsx - Project detail with chat + workflows tabs
+  pages/DevView.tsx       - Dev View: in-progress stories, Claude Code prompts, duplicate detection, prompt aggregation
   components/InteractiveResponse.tsx - Parses agent Q&A into interactive UI
   components/layout/      - Sidebar, Layout
   lib/api.ts              - API client functions
@@ -67,7 +76,7 @@ server/replit_integrations/  - AI integration modules (chat, audio, image, batch
 - `documents` - Auto-detected project artifacts (title, docType, content, agentName, phase, projectId, sessionId, messageId)
 - `epics` - Project epics (title, description, status, priority, projectId FK)
 - `sprints` - Project sprints (name, goal, status, startDate, endDate, projectId FK)
-- `stories` - User stories (title, description, acceptanceCriteria, status, priority, storyPoints, assignee, epicId FK, sprintId FK nullable, projectId FK)
+- `stories` - User stories (title, description, acceptanceCriteria, status, priority, storyPoints, assignee, prompt, mergedIntoStoryId, epicId FK, sprintId FK nullable, projectId FK)
 
 ## Data Model
 - Projects are the top-level entity

@@ -112,6 +112,8 @@ export const stories = pgTable("stories", {
   priority: text("priority").notNull().default("medium"),
   storyPoints: integer("story_points"),
   assignee: text("assignee"),
+  prompt: text("prompt"),
+  mergedIntoStoryId: integer("merged_into_story_id"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });

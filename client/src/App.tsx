@@ -9,6 +9,7 @@ import Workflows from "@/pages/Workflows";
 import Projects from "@/pages/Projects";
 import ProjectDetail from "@/pages/ProjectDetail";
 import Guide from "@/pages/Guide";
+import DevView from "@/pages/DevView";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/projects" component={Projects} />
+      <Route path="/projects/:id/dev" component={DevView} />
       <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/agents" component={Agents} />
       <Route path="/workflows" component={Workflows} />

@@ -583,6 +583,112 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
+  // ── Aggregate prompts from in-progress stories ──
+  app.post("/api/projects/:id/aggregate-prompts", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const { storyIds } = req.body as { storyIds?: number[] };
+    const allStories = await storage.getStoriesByProject(projectId);
+    const targetStories = storyIds
+      ? allStories.filter(s => storyIds.includes(s.id))
+      : allStories.filter(s => s.status === "in-progress" && s.prompt && !s.mergedIntoStoryId);
+    if (targetStories.length === 0) return res.json({ prompt: "", stories: [] });
+
+    const epics = await storage.getEpicsByProject(projectId);
+    const parts: string[] = [];
+    parts.push("# Implementation Prompt — Aggregated Stories\n");
+    parts.push(`Total stories: ${targetStories.length}\n`);
+
+    for (const story of targetStories) {
+      const epic = epics.find(e => e.id === story.epicId);
+      parts.push(`---\n## Story: ${story.title}`);
+      if (epic) parts.push(`**Epic:** ${epic.title}`);
+      if (story.description) parts.push(`**Description:** ${story.description}`);
+      if (story.acceptanceCriteria) parts.push(`**Acceptance Criteria:**\n${story.acceptanceCriteria}`);
+      if (story.prompt) parts.push(`**Implementation Prompt:**\n${story.prompt}`);
+      parts.push("");
+    }
+
+    res.json({ prompt: parts.join("\n"), stories: targetStories.map(s => ({ id: s.id, title: s.title })) });
+  });
+
+  // ── Detect duplicate stories ──
+  app.get("/api/projects/:id/duplicate-stories", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const allStories = await storage.getStoriesByProject(projectId);
+    const active = allStories.filter(s => !s.mergedIntoStoryId);
+
+    const duplicateGroups: { primary: number; duplicates: number[]; reason: string }[] = [];
+    const seen = new Set<number>();
+
+    for (let i = 0; i < active.length; i++) {
+      if (seen.has(active[i].id)) continue;
+      const dupes: number[] = [];
+      const a = active[i];
+      const aNorm = a.title.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+
+      for (let j = i + 1; j < active.length; j++) {
+        if (seen.has(active[j].id)) continue;
+        const b = active[j];
+        const bNorm = b.title.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+
+        const aWords = new Set(aNorm.split(/\s+/));
+        const bWords = new Set(bNorm.split(/\s+/));
+        const intersection = [...aWords].filter(w => bWords.has(w) && w.length > 2);
+        const union = new Set([...aWords, ...bWords]);
+        const similarity = intersection.length / union.size;
+
+        if (similarity > 0.6 || aNorm.includes(bNorm) || bNorm.includes(aNorm)) {
+          dupes.push(b.id);
+          seen.add(b.id);
+        }
+      }
+
+      if (dupes.length > 0) {
+        seen.add(a.id);
+        duplicateGroups.push({ primary: a.id, duplicates: dupes, reason: "Similar titles" });
+      }
+    }
+
+    res.json({ groups: duplicateGroups, stories: active });
+  });
+
+  // ── Merge duplicate stories ──
+  app.post("/api/stories/merge", async (req, res) => {
+    const { primaryId, duplicateIds } = req.body as { primaryId: number; duplicateIds: number[] };
+    if (!primaryId || !Array.isArray(duplicateIds) || duplicateIds.length === 0) {
+      return res.status(400).json({ error: "primaryId and non-empty duplicateIds array required" });
+    }
+    const primary = await storage.getStory(primaryId);
+    if (!primary) return res.status(404).json({ error: "Primary story not found" });
+
+    const dupes = [];
+    for (const dupId of duplicateIds) {
+      const dup = await storage.getStory(dupId);
+      if (!dup) continue;
+      if (dup.projectId !== primary.projectId) continue;
+      dupes.push(dup);
+    }
+
+    let mergedDesc = primary.description;
+    let mergedAC = primary.acceptanceCriteria;
+    for (const dup of dupes) {
+      if (dup.description && !mergedDesc.includes(dup.description)) {
+        mergedDesc += "\n\n---\n*Merged from: " + dup.title + "*\n" + dup.description;
+      }
+      if (dup.acceptanceCriteria && !mergedAC.includes(dup.acceptanceCriteria)) {
+        mergedAC += "\n" + dup.acceptanceCriteria;
+      }
+    }
+
+    await storage.updateStory(primaryId, { description: mergedDesc, acceptanceCriteria: mergedAC });
+    for (const dup of dupes) {
+      await storage.updateStory(dup.id, { mergedIntoStoryId: primaryId, status: "done" });
+    }
+
+    const updated = await storage.getStory(primaryId);
+    res.json(updated);
+  });
+
   // ── Import Epics/Stories from Document ──
   app.post("/api/projects/:id/import-epics", async (req, res) => {
     const projectId = parseInt(req.params.id);

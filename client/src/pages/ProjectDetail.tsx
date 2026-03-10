@@ -5,7 +5,7 @@ import { Layout } from "@/components/layout/Layout";
 import {
   ArrowLeft, Send, Bot, User, Sparkles, Plus, Loader2, MessageSquare,
   GitBranch, ArrowRight, ChevronDown, Trash2, FolderKanban, Command,
-  FileText, X, Download, PanelRightOpen, PanelRightClose, Eye
+  FileText, X, Download, PanelRightOpen, PanelRightClose, Eye, Code2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -400,6 +400,14 @@ export default function ProjectDetail() {
                 <FolderKanban size={14} />
                 Board
               </button>
+              <Link
+                href={`/projects/${projectId}/dev`}
+                data-testid="link-dev-view"
+                className="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+              >
+                <Code2 size={14} />
+                Dev View
+              </Link>
               <button
                 data-testid="tab-workflows"
                 onClick={() => setActiveTab("workflows")}

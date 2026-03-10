@@ -1,0 +1,461 @@
+import { useState } from "react";
+import { useParams, Link } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Layout } from "@/components/layout/Layout";
+import type { Story, Epic, Sprint } from "@shared/schema";
+import ReactMarkdown from "react-markdown";
+import {
+  ArrowLeft, Copy, Check, AlertTriangle, ArrowUp, ArrowDown, Minus,
+  ChevronDown, ChevronRight, Merge, ClipboardList, Sparkles, X,
+  CheckCircle2, FileText
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+async function apiGet<T>(url: string): Promise<T> {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function apiPost<T>(url: string, body: unknown): Promise<T> {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function apiPatch<T>(url: string, body: unknown): Promise<T> {
+  const r = await fetch(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+const PRIORITY_ICONS: Record<string, React.ReactNode> = {
+  critical: <AlertTriangle size={14} className="text-red-500" />,
+  high: <ArrowUp size={14} className="text-orange-500" />,
+  medium: <Minus size={14} className="text-yellow-500" />,
+  low: <ArrowDown size={14} className="text-blue-400" />,
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  backlog: "bg-slate-100 text-slate-600",
+  todo: "bg-blue-50 text-blue-700",
+  "in-progress": "bg-amber-50 text-amber-700",
+  review: "bg-purple-50 text-purple-700",
+  done: "bg-emerald-50 text-emerald-700",
+};
+
+export default function DevView() {
+  const params = useParams<{ id: string }>();
+  const projectId = parseInt(params.id!);
+  const queryClient = useQueryClient();
+
+  const { toast } = useToast();
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
+  const [promptDraft, setPromptDraft] = useState("");
+  const [aggregatedPrompt, setAggregatedPrompt] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const [selectedStoryIds, setSelectedStoryIds] = useState<Set<number>>(new Set());
+
+  const { data: stories = [] } = useQuery<Story[]>({
+    queryKey: ["stories", projectId],
+    queryFn: () => apiGet(`/api/projects/${projectId}/stories`),
+  });
+  const { data: epics = [] } = useQuery<Epic[]>({
+    queryKey: ["epics", projectId],
+    queryFn: () => apiGet(`/api/projects/${projectId}/epics`),
+  });
+  const { data: sprints = [] } = useQuery<Sprint[]>({
+    queryKey: ["sprints", projectId],
+    queryFn: () => apiGet(`/api/projects/${projectId}/sprints`),
+  });
+  const { data: duplicates } = useQuery<{ groups: { primary: number; duplicates: number[]; reason: string }[]; stories: Story[] }>({
+    queryKey: ["duplicates", projectId],
+    queryFn: () => apiGet(`/api/projects/${projectId}/duplicate-stories`),
+    enabled: showDuplicates,
+  });
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["stories", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["duplicates", projectId] });
+  };
+
+  const inProgressStories = stories.filter(s => s.status === "in-progress" && !s.mergedIntoStoryId);
+  const storiesWithPrompts = inProgressStories.filter(s => s.prompt);
+
+  const [saving, setSaving] = useState(false);
+  const savePrompt = async (storyId: number, prompt: string) => {
+    setSaving(true);
+    try {
+      await apiPatch(`/api/stories/${storyId}`, { prompt });
+      invalidateAll();
+      toast({ title: "Prompt saved" });
+    } catch (e: any) {
+      toast({ title: "Failed to save prompt", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const aggregateMutation = useMutation({
+    mutationFn: () => {
+      const ids = selectedStoryIds.size > 0 ? Array.from(selectedStoryIds) : undefined;
+      return apiPost<{ prompt: string }>(`/api/projects/${projectId}/aggregate-prompts`, { storyIds: ids });
+    },
+    onSuccess: (data) => {
+      setAggregatedPrompt(data.prompt);
+      toast({ title: "Prompts aggregated", description: `Combined prompts ready to copy` });
+    },
+    onError: (e: Error) => toast({ title: "Aggregation failed", description: e.message, variant: "destructive" }),
+  });
+
+  const mergeMutation = useMutation({
+    mutationFn: (args: { primaryId: number; duplicateIds: number[] }) =>
+      apiPost(`/api/stories/merge`, args),
+    onSuccess: () => {
+      invalidateAll();
+      setShowDuplicates(true);
+      queryClient.invalidateQueries({ queryKey: ["duplicates", projectId] });
+      toast({ title: "Stories merged successfully" });
+    },
+    onError: (e: Error) => toast({ title: "Merge failed", description: e.message, variant: "destructive" }),
+  });
+
+  const handleCopy = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const toggleStorySelection = (id: number) => {
+    setSelectedStoryIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectStory = (story: Story) => {
+    setSelectedStory(story);
+    setPromptDraft(story.prompt || "");
+  };
+
+  return (
+    <Layout>
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
+          <Link href={`/projects/${projectId}`} data-testid="link-back-to-project" className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft size={18} />
+          </Link>
+          <div className="flex-1">
+            <h1 className="text-lg font-heading font-semibold text-foreground" data-testid="text-dev-view-title">Dev View</h1>
+            <p className="text-xs text-muted-foreground">
+              {inProgressStories.length} in-progress stories &middot; {storiesWithPrompts.length} with prompts
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              data-testid="button-show-duplicates"
+              onClick={() => setShowDuplicates(!showDuplicates)}
+              className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                showDuplicates ? "bg-amber-100 text-amber-800" : "text-muted-foreground hover:bg-muted"
+              )}
+            >
+              <Merge size={14} /> Duplicates
+              {duplicates && duplicates.groups.length > 0 && (
+                <span className="bg-amber-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{duplicates.groups.length}</span>
+              )}
+            </button>
+            <button
+              data-testid="button-aggregate-prompts"
+              onClick={() => aggregateMutation.mutate()}
+              disabled={aggregateMutation.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+            >
+              <Sparkles size={14} /> {aggregateMutation.isPending ? "Building..." : "Aggregate Prompts"}
+            </button>
+          </div>
+        </header>
+
+        <div className="flex-1 flex overflow-hidden">
+          <div className="w-[380px] border-r border-border flex flex-col overflow-hidden shrink-0">
+            <div className="px-3 py-2 border-b border-border bg-muted/30">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">In Progress Stories</span>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {inProgressStories.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+                  <ClipboardList size={40} className="text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">No stories in progress</p>
+                  <p className="text-xs text-muted-foreground mt-1">Move stories to "In Progress" on the Board tab</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/50">
+                  {inProgressStories.map(story => {
+                    const epic = epics.find(e => e.id === story.epicId);
+                    const isSelected = selectedStory?.id === story.id;
+                    const isChecked = selectedStoryIds.has(story.id);
+
+                    return (
+                      <div
+                        key={story.id}
+                        data-testid={`dev-story-${story.id}`}
+                        className={cn("flex items-start gap-2 px-3 py-3 cursor-pointer transition-colors",
+                          isSelected ? "bg-primary/5 border-l-2 border-primary" : "hover:bg-muted/30 border-l-2 border-transparent"
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleStorySelection(story.id)}
+                          className="mt-1 shrink-0 accent-primary"
+                          data-testid={`checkbox-story-${story.id}`}
+                        />
+                        <div className="flex-1 min-w-0" onClick={() => selectStory(story)}>
+                          <div className="flex items-center gap-1.5">
+                            {PRIORITY_ICONS[story.priority]}
+                            <span className="text-sm font-medium text-foreground truncate">{story.title}</span>
+                          </div>
+                          {epic && <p className="text-xs text-muted-foreground mt-0.5 truncate">{epic.title}</p>}
+                          <div className="flex items-center gap-2 mt-1">
+                            {story.storyPoints && <span className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">{story.storyPoints}</span>}
+                            {story.prompt ? (
+                              <span className="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <CheckCircle2 size={10} /> Prompt ready
+                              </span>
+                            ) : (
+                              <span className="text-xs bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded">No prompt</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {showDuplicates && duplicates ? (
+              <DuplicatePanel
+                groups={duplicates.groups}
+                stories={stories}
+                epics={epics}
+                onMerge={(primaryId, duplicateIds) => mergeMutation.mutate({ primaryId, duplicateIds })}
+                onClose={() => setShowDuplicates(false)}
+              />
+            ) : aggregatedPrompt !== null ? (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+                  <h2 className="text-sm font-semibold text-foreground">Aggregated Prompt</h2>
+                  <div className="flex items-center gap-2">
+                    <button
+                      data-testid="button-copy-aggregate"
+                      onClick={() => handleCopy(aggregatedPrompt)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+                    >
+                      {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy to Clipboard</>}
+                    </button>
+                    <button
+                      data-testid="button-close-aggregate"
+                      onClick={() => setAggregatedPrompt(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-auto p-4">
+                  <div className="prose prose-sm max-w-none">
+                    <ReactMarkdown>{aggregatedPrompt}</ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            ) : selectedStory ? (
+              <StoryPromptEditor
+                story={selectedStory}
+                epic={epics.find(e => e.id === selectedStory.epicId)}
+                promptDraft={promptDraft}
+                onPromptChange={setPromptDraft}
+                saving={saving}
+                onSave={async () => {
+                  await savePrompt(selectedStory.id, promptDraft);
+                  setSelectedStory({ ...selectedStory, prompt: promptDraft });
+                }}
+                onCopy={() => handleCopy(promptDraft)}
+                copied={copied}
+              />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+                <FileText size={48} className="text-muted-foreground/20 mb-4" />
+                <h3 className="text-lg font-semibold text-foreground">Select a Story</h3>
+                <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                  Click on an in-progress story from the left panel to write an implementation prompt for Claude Code.
+                  Use the checkboxes to select stories, then click "Aggregate Prompts" to combine them.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+function StoryPromptEditor({ story, epic, promptDraft, onPromptChange, onSave, onCopy, copied, saving }: {
+  story: Story; epic?: Epic; promptDraft: string;
+  onPromptChange: (v: string) => void; onSave: () => void;
+  onCopy: () => void; copied: boolean; saving?: boolean;
+}) {
+  const [showPreview, setShowPreview] = useState(false);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="px-4 py-3 border-b border-border bg-muted/30 shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">{story.title}</h2>
+            {epic && <p className="text-xs text-muted-foreground">{epic.title}</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              data-testid="button-toggle-preview"
+              onClick={() => setShowPreview(!showPreview)}
+              className={cn("px-3 py-1 rounded-lg text-xs font-medium transition-colors",
+                showPreview ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              )}
+            >
+              {showPreview ? "Edit" : "Preview"}
+            </button>
+            {promptDraft && (
+              <button
+                data-testid="button-copy-prompt"
+                onClick={onCopy}
+                className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+              >
+                {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+              </button>
+            )}
+            <button
+              data-testid="button-save-prompt"
+              onClick={onSave}
+              disabled={saving}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Prompt"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-b border-border bg-background px-4 py-3 shrink-0 space-y-2">
+        <div className="prose prose-sm max-w-none">
+          <p className="text-sm text-foreground"><strong>Description:</strong> {story.description || "—"}</p>
+        </div>
+        {story.acceptanceCriteria && (
+          <details className="text-sm">
+            <summary className="text-xs font-medium text-muted-foreground cursor-pointer">Acceptance Criteria</summary>
+            <div className="prose prose-sm max-w-none mt-1 pl-2 border-l-2 border-border">
+              <ReactMarkdown>{story.acceptanceCriteria}</ReactMarkdown>
+            </div>
+          </details>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="px-4 py-2 border-b border-border bg-background">
+          <label className="text-xs font-medium text-muted-foreground">Implementation Prompt for Claude Code</label>
+        </div>
+        {showPreview ? (
+          <div className="flex-1 overflow-auto p-4">
+            <div className="prose prose-sm max-w-none">
+              <ReactMarkdown>{promptDraft || "*No prompt written yet*"}</ReactMarkdown>
+            </div>
+          </div>
+        ) : (
+          <textarea
+            data-testid="textarea-story-prompt"
+            value={promptDraft}
+            onChange={e => onPromptChange(e.target.value)}
+            placeholder={"Describe what Claude Code should implement for this story.\n\nExample:\n- Implement the API endpoint for...\n- Add a React component that...\n- Update the database schema to...\n- Write tests for..."}
+            className="flex-1 w-full px-4 py-3 bg-background text-sm text-foreground outline-none resize-none font-mono leading-relaxed"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DuplicatePanel({ groups, stories, epics, onMerge, onClose }: {
+  groups: { primary: number; duplicates: number[]; reason: string }[];
+  stories: Story[]; epics: Epic[];
+  onMerge: (primaryId: number, duplicateIds: number[]) => void;
+  onClose: () => void;
+}) {
+  const storyMap = new Map(stories.map(s => [s.id, s]));
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-amber-50/50">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Merge size={16} className="text-amber-600" /> Potential Duplicates
+          </h2>
+          <p className="text-xs text-muted-foreground">{groups.length} group{groups.length !== 1 ? "s" : ""} found</p>
+        </div>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground" data-testid="button-close-duplicates">
+          <X size={18} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        {groups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <CheckCircle2 size={40} className="text-emerald-400 mb-3" />
+            <p className="text-sm text-foreground font-medium">No duplicates found</p>
+            <p className="text-xs text-muted-foreground mt-1">All stories appear to be unique</p>
+          </div>
+        ) : (
+          groups.map((group, gi) => {
+            const primary = storyMap.get(group.primary);
+            if (!primary) return null;
+            const dupes = group.duplicates.map(id => storyMap.get(id)).filter(Boolean) as Story[];
+
+            return (
+              <div key={gi} className="glass-card rounded-xl p-4" data-testid={`duplicate-group-${gi}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded">{group.reason}</span>
+                  <button
+                    data-testid={`button-merge-group-${gi}`}
+                    onClick={() => onMerge(group.primary, group.duplicates)}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                  >
+                    <Merge size={12} /> Merge into Primary
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
+                    <span className="text-xs font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5">PRIMARY</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">{primary.title}</p>
+                      {primary.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{primary.description}</p>}
+                    </div>
+                  </div>
+                  {dupes.map(d => (
+                    <div key={d.id} className="flex items-start gap-2 p-2 rounded-lg bg-muted/30 border border-border">
+                      <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">DUPE</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{d.title}</p>
+                        {d.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{d.description}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
