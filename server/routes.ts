@@ -199,9 +199,7 @@ export async function registerRoutes(
 
       const allAgents = await storage.getAgents();
       const activeAgents = allAgents.filter(a => a.status === "active");
-      
-      // Pick 2-3 relevant agents for party mode
-      const partyAgents = activeAgents.slice(0, 3);
+      const partyAgents = activeAgents;
 
       // Set up SSE
       res.setHeader("Content-Type", "text/event-stream");
