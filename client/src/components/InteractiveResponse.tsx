@@ -16,171 +16,110 @@ interface ParsedContent {
   closing: string;
 }
 
+const MC_OPTION = /^[\s]*[-•*]?\s*\**([a-eA-E])\s*[).:\]]\**\s+(.+)/;
+const ENDS_WITH_QUESTION = /\?\s*\**\s*$/;
+
+function isQuestionLine(text: string): boolean {
+  const stripped = text.replace(/\*{1,2}/g, "").trim();
+  return ENDS_WITH_QUESTION.test(stripped);
+}
+
 function parseAgentResponse(content: string): ParsedContent | null {
   const lines = content.split("\n");
   const questions: ParsedQuestion[] = [];
-  let preambleLines: string[] = [];
-  let closingLines: string[] = [];
-  let currentQuestion: Partial<ParsedQuestion> | null = null;
-  let foundQuestions = false;
-  let doneWithQuestions = false;
+  const preambleLines: string[] = [];
+  const closingLines: string[] = [];
 
-  const mcOptionPattern = /^[\s]*[-•*]?\s*\**([a-eA-E])\s*[).:\]]\**\s+(.+)/;
-  const numberedOptionPattern = /^[\s]*[-•*]?\s*\**(\d+)\s*[).:]\**\s+(.+)/;
-  const questionPattern = /^[\s]*(?:#{1,4}\s+)?(?:\*{1,2})?(?:(?:Question|Q)\s*#?\s*(\d+)|(\d+)\s*[).:])\s*\**\s*(.*)/i;
-  const standaloneQuestionPattern = /\?\s*\**\s*$/;
+  let i = 0;
+  let foundInteractive = false;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (doneWithQuestions) {
-      closingLines.push(line);
-      continue;
-    }
-
-    const qMatch = trimmed.match(questionPattern);
-    if (qMatch) {
-      if (currentQuestion && currentQuestion.prompt) {
-        if (!currentQuestion.type) currentQuestion.type = "open-ended";
-        questions.push(currentQuestion as ParsedQuestion);
-      }
-      foundQuestions = true;
-      const rawPrompt = (qMatch[3] || trimmed).replace(/^\s*[:.]?\s*/, "").replace(/\*{1,2}/g, "").trim();
-      currentQuestion = {
-        id: questions.length + 1,
-        prompt: rawPrompt || trimmed,
-        type: undefined as any,
-        options: [],
-      };
-      continue;
-    }
-
-    if (foundQuestions && currentQuestion) {
-      const mcMatch = trimmed.match(mcOptionPattern);
-      if (mcMatch) {
-        currentQuestion.type = "multiple-choice";
-        currentQuestion.options = currentQuestion.options || [];
-        currentQuestion.options.push({ label: mcMatch[1].toUpperCase(), text: mcMatch[2].replace(/\*{1,2}/g, "").trim() });
-        continue;
-      }
-
-      if (trimmed === "" && currentQuestion.options && currentQuestion.options.length > 0) {
-        questions.push(currentQuestion as ParsedQuestion);
-        currentQuestion = null;
-
-        const remaining = lines.slice(i + 1);
-        const hasMoreQuestions = remaining.some(l => questionPattern.test(l.trim()));
-        if (!hasMoreQuestions) {
-          doneWithQuestions = true;
-        }
-        continue;
-      }
-
-      if (trimmed === "" && (!currentQuestion.options || currentQuestion.options.length === 0)) {
-        if (currentQuestion.prompt && standaloneQuestionPattern.test(currentQuestion.prompt)) {
-          currentQuestion.type = "open-ended";
-          questions.push(currentQuestion as ParsedQuestion);
-          currentQuestion = null;
-
-          const remaining = lines.slice(i + 1);
-          const hasMoreQuestions = remaining.some(l => questionPattern.test(l.trim()));
-          if (!hasMoreQuestions) {
-            doneWithQuestions = true;
-          }
-        }
-        continue;
-      }
-
-      if (!currentQuestion.options || currentQuestion.options.length === 0) {
-        currentQuestion.prompt += " " + trimmed;
-      }
-      continue;
-    }
-
-    if (!foundQuestions) {
-      preambleLines.push(line);
-    }
-  }
-
-  if (currentQuestion && currentQuestion.prompt) {
-    if (!currentQuestion.type) currentQuestion.type = "open-ended";
-    questions.push(currentQuestion as ParsedQuestion);
-  }
-
-  if (questions.length === 0) {
-    const mcBlocks = findInlineChoices(content);
-    if (mcBlocks && mcBlocks.questions.length > 0) return mcBlocks;
-    return null;
-  }
-
-  return {
-    preamble: preambleLines.join("\n").trim(),
-    questions,
-    closing: closingLines.join("\n").trim(),
-  };
-}
-
-function findInlineChoices(content: string): ParsedContent | null {
-  const lines = content.split("\n");
-  const questions: ParsedQuestion[] = [];
-  let preambleLines: string[] = [];
-  let closingLines: string[] = [];
-  let collectingOptions = false;
-  let currentOptions: { label: string; text: string }[] = [];
-  let questionPrompt = "";
-  let foundAny = false;
-
-  const optionPattern = /^[\s]*[-•*]?\s*\**([a-eA-E])\s*[).:\]]\**\s+(.+)/;
-
-  for (let i = 0; i < lines.length; i++) {
+  while (i < lines.length) {
     const trimmed = lines[i].trim();
-    const optMatch = trimmed.match(optionPattern);
 
-    if (optMatch) {
-      if (!collectingOptions) {
-        collectingOptions = true;
-        if (preambleLines.length > 0) {
-          const lastNonEmpty = [...preambleLines].reverse().findIndex(l => l.trim() !== "");
-          if (lastNonEmpty >= 0) {
-            const qIdx = preambleLines.length - 1 - lastNonEmpty;
-            questionPrompt = preambleLines[qIdx].trim();
-            preambleLines = preambleLines.slice(0, qIdx);
+    const mcMatch = trimmed.match(MC_OPTION);
+    if (mcMatch) {
+      const options: { label: string; text: string }[] = [];
+      let questionPrompt = "";
+
+      if (!foundInteractive && preambleLines.length > 0) {
+        for (let j = preambleLines.length - 1; j >= 0; j--) {
+          if (preambleLines[j].trim() !== "") {
+            questionPrompt = preambleLines[j].replace(/\*{1,2}/g, "").replace(/^\s*\d+\s*[).:]?\s*/, "").trim();
+            preambleLines.splice(j);
+            break;
+          }
+        }
+      } else if (foundInteractive && closingLines.length > 0) {
+        for (let j = closingLines.length - 1; j >= 0; j--) {
+          if (closingLines[j].trim() !== "") {
+            questionPrompt = closingLines[j].replace(/\*{1,2}/g, "").replace(/^\s*\d+\s*[).:]?\s*/, "").trim();
+            closingLines.splice(j);
+            break;
           }
         }
       }
-      currentOptions.push({ label: optMatch[1].toUpperCase(), text: optMatch[2].trim() });
-      foundAny = true;
-    } else {
-      if (collectingOptions && currentOptions.length > 0) {
+
+      while (i < lines.length) {
+        const optMatch = lines[i].trim().match(MC_OPTION);
+        if (optMatch) {
+          options.push({ label: optMatch[1].toUpperCase(), text: optMatch[2].replace(/\*{1,2}/g, "").trim() });
+          i++;
+        } else {
+          break;
+        }
+      }
+
+      if (options.length >= 2) {
+        foundInteractive = true;
         questions.push({
           id: questions.length + 1,
-          prompt: questionPrompt || "Choose one:",
+          prompt: questionPrompt || "Select an option:",
           type: "multiple-choice",
-          options: [...currentOptions],
+          options,
         });
-        currentOptions = [];
-        collectingOptions = false;
-        questionPrompt = "";
       }
-      if (!foundAny) {
-        preambleLines.push(lines[i]);
-      } else {
-        closingLines.push(lines[i]);
+      continue;
+    }
+
+    if (isQuestionLine(trimmed) && trimmed.length > 10) {
+      const cleanPrompt = trimmed.replace(/\*{1,2}/g, "").replace(/^[\s]*(?:#{1,4}\s+)?(?:\d+\s*[).:]?\s*)?/, "").trim();
+
+      let hasOptionsAfter = false;
+      for (let j = i + 1; j < lines.length && j <= i + 8; j++) {
+        if (lines[j].trim().match(MC_OPTION)) {
+          hasOptionsAfter = true;
+          break;
+        }
+      }
+
+      if (!hasOptionsAfter && cleanPrompt.length > 10) {
+        foundInteractive = true;
+        questions.push({
+          id: questions.length + 1,
+          prompt: cleanPrompt,
+          type: "open-ended",
+        });
+        i++;
+        continue;
       }
     }
-  }
 
-  if (currentOptions.length > 0) {
-    questions.push({
-      id: questions.length + 1,
-      prompt: questionPrompt || "Choose one:",
-      type: "multiple-choice",
-      options: [...currentOptions],
-    });
+    if (foundInteractive) {
+      closingLines.push(lines[i]);
+    } else {
+      preambleLines.push(lines[i]);
+    }
+    i++;
   }
 
   if (questions.length === 0) return null;
+
+  const hasRealQuestions = questions.some(q =>
+    q.type === "multiple-choice" ||
+    (q.type === "open-ended" && isQuestionLine(q.prompt))
+  );
+
+  if (!hasRealQuestions) return null;
 
   return {
     preamble: preambleLines.join("\n").trim(),
@@ -294,7 +233,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
       </div>
 
       {parsed.closing && (
-        <div className="prose prose-invert prose-sm max-w-none">
+        <div className="prose prose-invert prose-sm max-w-none mt-3">
           <ReactMarkdown>{parsed.closing}</ReactMarkdown>
         </div>
       )}
