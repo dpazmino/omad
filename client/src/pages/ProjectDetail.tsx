@@ -4,15 +4,17 @@ import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import {
   ArrowLeft, Send, Bot, User, Sparkles, Plus, Loader2, MessageSquare,
-  GitBranch, ArrowRight, ChevronDown, Trash2, FolderKanban, Command
+  GitBranch, ArrowRight, ChevronDown, Trash2, FolderKanban, Command,
+  FileText, X, Download, PanelRightOpen, PanelRightClose, Eye
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   fetchAgents, fetchMessages, createSession, deleteSession,
   streamChat, fetchProjectSessions, updateProject, updateSession,
+  fetchProjectDocuments, deleteDocument, scanProjectDocuments,
   type StreamEvent
 } from "@/lib/api";
-import type { Agent, ChatMessage, Session, Project } from "@shared/schema";
+import type { Agent, ChatMessage, Session, Project, Document } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import { InteractiveResponse } from "@/components/InteractiveResponse";
 
@@ -110,9 +112,16 @@ export default function ProjectDetail() {
     queryFn: () => (activeSessionId ? fetchMessages(activeSessionId) : Promise.resolve([])),
     enabled: !!activeSessionId,
   });
+  const { data: projectDocuments = [] } = useQuery({
+    queryKey: ["project-documents", projectId],
+    queryFn: () => fetchProjectDocuments(projectId),
+    refetchInterval: 5000,
+  });
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const activeAgent = agents.find(a => a.id === activeSession?.activeAgentId);
+  const [showDocPanel, setShowDocPanel] = useState(true);
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
 
   useEffect(() => {
     if (sessions.length > 0 && !activeSessionId) {
@@ -239,6 +248,7 @@ export default function ProjectDetail() {
       setPartyResponses([]);
       queryClient.invalidateQueries({ queryKey: ["messages", sid] });
       queryClient.invalidateQueries({ queryKey: ["project-sessions", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
     }
   };
 
@@ -355,32 +365,53 @@ export default function ProjectDetail() {
         </header>
 
         {activeTab === "chat" ? (
-          <ChatView
-            sessions={sessions}
-            messages={messages}
-            agents={agents}
-            activeSessionId={activeSessionId}
-            activeSession={activeSession || null}
-            activeAgent={activeAgent || null}
-            isStreaming={isStreaming}
-            streamingContent={streamingContent}
-            partyMode={partyMode}
-            partyResponses={partyResponses}
-            input={input}
-            messagesEndRef={messagesEndRef}
-            onSetInput={setInput}
-            onSetActiveSessionId={setActiveSessionId}
-            onSetPartyMode={setPartyMode}
-            onNewSession={handleNewSession}
-            onDeleteSession={handleDeleteSession}
-            onSend={handleSend}
-            onSendMessage={sendMessage}
-            onCommand={handleCommand}
-            onAgentSwitch={handleAgentSwitch}
-            currentPhase={currentPhase}
-            errorMessage={errorMessage}
-            onDismissError={() => setErrorMessage(null)}
-          />
+          <div className="flex-1 flex overflow-hidden">
+            <ChatView
+              sessions={sessions}
+              messages={messages}
+              agents={agents}
+              activeSessionId={activeSessionId}
+              activeSession={activeSession || null}
+              activeAgent={activeAgent || null}
+              isStreaming={isStreaming}
+              streamingContent={streamingContent}
+              partyMode={partyMode}
+              partyResponses={partyResponses}
+              input={input}
+              messagesEndRef={messagesEndRef}
+              onSetInput={setInput}
+              onSetActiveSessionId={setActiveSessionId}
+              onSetPartyMode={setPartyMode}
+              onNewSession={handleNewSession}
+              onDeleteSession={handleDeleteSession}
+              onSend={handleSend}
+              onSendMessage={sendMessage}
+              onCommand={handleCommand}
+              onAgentSwitch={handleAgentSwitch}
+              currentPhase={currentPhase}
+              errorMessage={errorMessage}
+              onDismissError={() => setErrorMessage(null)}
+              showDocPanel={showDocPanel}
+              onToggleDocPanel={() => setShowDocPanel(!showDocPanel)}
+            />
+            {showDocPanel && (
+              <DocumentsPanel
+                documents={projectDocuments}
+                viewingDoc={viewingDoc}
+                onViewDoc={setViewingDoc}
+                onDeleteDoc={async (id) => {
+                  await deleteDocument(id);
+                  queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
+                  if (viewingDoc?.id === id) setViewingDoc(null);
+                }}
+                onClose={() => setShowDocPanel(false)}
+                onScan={async () => {
+                  await scanProjectDocuments(projectId);
+                  queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
+                }}
+              />
+            )}
+          </div>
         ) : (
           <WorkflowsView phase={project.phase} />
         )}
@@ -394,7 +425,7 @@ function ChatView({
   isStreaming, streamingContent, partyMode, partyResponses, input, messagesEndRef,
   onSetInput, onSetActiveSessionId, onSetPartyMode, onNewSession, onDeleteSession,
   onSend, onSendMessage, onCommand, onAgentSwitch, currentPhase,
-  errorMessage, onDismissError,
+  errorMessage, onDismissError, showDocPanel, onToggleDocPanel,
 }: {
   sessions: Session[];
   messages: ChatMessage[];
@@ -420,6 +451,8 @@ function ChatView({
   currentPhase: typeof BMAD_PHASES[0];
   errorMessage: string | null;
   onDismissError: () => void;
+  showDocPanel: boolean;
+  onToggleDocPanel: () => void;
 }) {
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -512,6 +545,20 @@ function ChatView({
           >
             <Sparkles size={12} />
             Party: {partyMode ? "On" : "Off"}
+          </button>
+
+          <button
+            data-testid="button-toggle-docs"
+            onClick={onToggleDocPanel}
+            className={cn(
+              "px-2 py-1 rounded-md text-xs font-medium border transition-colors flex items-center gap-1",
+              showDocPanel
+                ? "bg-primary/20 text-primary border-primary/30"
+                : "bg-white/5 text-muted-foreground border-border hover:text-foreground"
+            )}
+          >
+            {showDocPanel ? <PanelRightClose size={12} /> : <PanelRightOpen size={12} />}
+            Docs
           </button>
 
           <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
@@ -843,6 +890,153 @@ function MessageBubble({ message, agents, isLastAssistantMessage, isStreaming, o
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+const DOC_TYPE_ICONS: Record<string, { icon: string; color: string }> = {
+  "product-brief": { icon: "📋", color: "text-blue-400" },
+  "brainstorm": { icon: "💡", color: "text-yellow-300" },
+  "market-research": { icon: "📊", color: "text-green-400" },
+  "prd": { icon: "📄", color: "text-purple-400" },
+  "ux-design": { icon: "🎨", color: "text-pink-400" },
+  "architecture": { icon: "🏗️", color: "text-orange-400" },
+  "epic": { icon: "📦", color: "text-yellow-400" },
+  "stories": { icon: "📝", color: "text-cyan-400" },
+  "sprint-plan": { icon: "🏃", color: "text-emerald-400" },
+  "implementation-plan": { icon: "⚙️", color: "text-amber-400" },
+  "code-review": { icon: "🔍", color: "text-red-400" },
+  "qa-report": { icon: "✅", color: "text-teal-400" },
+  "test-plan": { icon: "🧪", color: "text-indigo-400" },
+  "general": { icon: "📎", color: "text-gray-400" },
+};
+
+function DocumentsPanel({
+  documents, viewingDoc, onViewDoc, onDeleteDoc, onClose, onScan,
+}: {
+  documents: Document[];
+  viewingDoc: Document | null;
+  onViewDoc: (doc: Document | null) => void;
+  onDeleteDoc: (id: number) => void;
+  onClose: () => void;
+  onScan: () => void;
+}) {
+  const [scanning, setScanning] = useState(false);
+
+  return (
+    <div className="w-80 border-l border-border/50 glass-panel flex flex-col shrink-0 hidden lg:flex animate-in slide-in-from-right-5 duration-300" data-testid="documents-panel">
+      <div className="p-3 border-b border-border/50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText size={14} className="text-primary" />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Documents</span>
+          {documents.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-medium">
+              {documents.length}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            data-testid="button-scan-docs"
+            onClick={async () => { setScanning(true); await onScan(); setScanning(false); }}
+            disabled={scanning}
+            className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+            title="Scan conversations for documents"
+          >
+            {scanning ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          </button>
+          <button
+            data-testid="button-close-docs"
+            onClick={onClose}
+            className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+
+      {viewingDoc ? (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="p-3 border-b border-border/50 flex items-center gap-2">
+            <button
+              data-testid="button-back-to-docs"
+              onClick={() => onViewDoc(null)}
+              className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft size={14} />
+            </button>
+            <span className="text-xs font-medium truncate flex-1">{viewingDoc.title}</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown>{viewingDoc.content}</ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-1">
+          {documents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-4 py-8">
+              <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
+                <FileText size={20} className="text-muted-foreground" />
+              </div>
+              <p className="text-xs text-muted-foreground mb-1 font-medium">No documents yet</p>
+              <p className="text-[10px] text-muted-foreground/70">
+                Documents are auto-saved when agents create briefs, PRDs, architecture docs, and other artifacts.
+              </p>
+            </div>
+          ) : (
+            documents.map(doc => {
+              const typeInfo = DOC_TYPE_ICONS[doc.docType] || DOC_TYPE_ICONS["general"];
+              return (
+                <div
+                  key={doc.id}
+                  data-testid={`doc-item-${doc.id}`}
+                  className="group glass-card rounded-lg border border-white/5 hover:border-primary/20 transition-all cursor-pointer"
+                >
+                  <div className="p-3" onClick={() => onViewDoc(doc)}>
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-lg mt-0.5">{typeInfo.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-foreground truncate">{doc.title}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-white/5", typeInfo.color)}>
+                            {doc.docType.replace("-", " ")}
+                          </span>
+                        </div>
+                        {doc.agentName && (
+                          <div className="text-[10px] text-muted-foreground mt-1 truncate">
+                            by {doc.agentName}
+                          </div>
+                        )}
+                        <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                          {new Date(doc.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-3 pb-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      data-testid={`button-view-doc-${doc.id}`}
+                      onClick={() => onViewDoc(doc)}
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-[10px] hover:bg-primary/20 transition-colors"
+                    >
+                      <Eye size={10} /> View
+                    </button>
+                    <button
+                      data-testid={`button-delete-doc-${doc.id}`}
+                      onClick={() => onDeleteDoc(doc.id)}
+                      className="flex items-center justify-center gap-1 px-2 py-1 rounded-md bg-red-500/10 text-red-400 text-[10px] hover:bg-red-500/20 transition-colors"
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { Agent, Session, ChatMessage, Project } from "@shared/schema";
+import type { Agent, Session, ChatMessage, Project, Document } from "@shared/schema";
 
 const API = "/api";
 
@@ -84,6 +84,38 @@ export async function updateProject(id: number, data: Partial<Project>): Promise
 
 export async function deleteProject(id: number): Promise<void> {
   await fetch(`${API}/projects/${id}`, { method: "DELETE" });
+}
+
+export async function fetchProjectDocuments(projectId: number): Promise<Document[]> {
+  const res = await fetch(`${API}/projects/${projectId}/documents`);
+  if (!res.ok) throw new Error("Failed to fetch project documents");
+  return res.json();
+}
+
+export async function fetchDocument(id: number): Promise<Document> {
+  const res = await fetch(`${API}/documents/${id}`);
+  if (!res.ok) throw new Error("Failed to fetch document");
+  return res.json();
+}
+
+export async function createDocument(projectId: number, data: { title: string; docType: string; content: string; agentName?: string; phase?: string; sessionId?: number; messageId?: number }): Promise<Document> {
+  const res = await fetch(`${API}/projects/${projectId}/documents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create document");
+  return res.json();
+}
+
+export async function deleteDocument(id: number): Promise<void> {
+  await fetch(`${API}/documents/${id}`, { method: "DELETE" });
+}
+
+export async function scanProjectDocuments(projectId: number): Promise<{ scanned: number; documents: Document[] }> {
+  const res = await fetch(`${API}/projects/${projectId}/scan-documents`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to scan documents");
+  return res.json();
 }
 
 export async function fetchBmadHelp(): Promise<any> {

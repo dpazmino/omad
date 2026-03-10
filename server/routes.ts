@@ -9,6 +9,66 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+const DOCUMENT_PATTERNS: { pattern: RegExp; docType: string; title: string }[] = [
+  { pattern: /^#+\s+product\s+brief/im, docType: "product-brief", title: "Product Brief" },
+  { pattern: /^#+\s+project\s+brief/im, docType: "product-brief", title: "Project Brief" },
+  { pattern: /^#+\s+[\w\s]*brief\s*(—|–|-)/im, docType: "product-brief", title: "Product Brief" },
+  { pattern: /^#+\s+market\s+research/im, docType: "market-research", title: "Market Research" },
+  { pattern: /^#+\s+competitive\s+analysis/im, docType: "market-research", title: "Competitive Analysis" },
+  { pattern: /^#+\s+brainstorm\s+summary/im, docType: "brainstorm", title: "Brainstorm Summary" },
+  { pattern: /^#+\s+product\s+requirements?\s+document/im, docType: "prd", title: "Product Requirements Document" },
+  { pattern: /^#+\s+PRD/m, docType: "prd", title: "Product Requirements Document" },
+  { pattern: /^#+\s+ux\s+design/im, docType: "ux-design", title: "UX Design" },
+  { pattern: /^#+\s+user\s+experience/im, docType: "ux-design", title: "UX Design" },
+  { pattern: /^#+\s+architecture/im, docType: "architecture", title: "Architecture Document" },
+  { pattern: /^#+\s+technical\s+architecture/im, docType: "architecture", title: "Technical Architecture" },
+  { pattern: /^#+\s+system\s+architecture/im, docType: "architecture", title: "System Architecture" },
+  { pattern: /^#+\s+epic/im, docType: "epic", title: "Epic" },
+  { pattern: /^#+\s+user\s+stor/im, docType: "stories", title: "User Stories" },
+  { pattern: /^#+\s+sprint\s+plan/im, docType: "sprint-plan", title: "Sprint Plan" },
+  { pattern: /^#+\s+implementation\s+plan/im, docType: "implementation-plan", title: "Implementation Plan" },
+  { pattern: /^#+\s+code\s+review/im, docType: "code-review", title: "Code Review" },
+  { pattern: /^#+\s+qa\s+report/im, docType: "qa-report", title: "QA Report" },
+  { pattern: /^#+\s+test\s+plan/im, docType: "test-plan", title: "Test Plan" },
+];
+
+async function detectAndSaveDocument(
+  content: string,
+  projectId: number | null,
+  sessionId: number,
+  messageId: number,
+  agentName: string | null,
+  phase: string
+) {
+  if (!projectId || content.length < 200) return;
+
+  for (const { pattern, docType, title } of DOCUMENT_PATTERNS) {
+    if (pattern.test(content)) {
+      const existing = await storage.getDocumentsByProject(projectId);
+      const duplicate = existing.find(d => d.docType === docType && d.sessionId === sessionId);
+      if (duplicate) {
+        await storage.updateDocument(duplicate.id, { content, messageId });
+        console.log(`Updated document: ${title} (project ${projectId})`);
+      } else {
+        const headerMatch = content.match(/^#\s+(.+)/m);
+        const docTitle = headerMatch ? headerMatch[1].trim() : title;
+        await storage.createDocument({
+          projectId,
+          sessionId,
+          messageId,
+          title: docTitle,
+          docType,
+          content,
+          agentName,
+          phase,
+        });
+        console.log(`Auto-saved document: ${docTitle} (project ${projectId})`);
+      }
+      return;
+    }
+  }
+}
+
 async function seedAgents() {
   const existing = await storage.getAgents();
   if (existing.length === 0) {
@@ -162,6 +222,12 @@ export async function registerRoutes(
         await storage.updateSession(sessionId, { title: titleContent });
       }
 
+      const project = session.projectId ? await storage.getProject(session.projectId) : null;
+      detectAndSaveDocument(
+        fullResponse, session.projectId, sessionId, assistantMsg.id,
+        `${agent.name} (${agent.title})`, project?.phase || "analysis"
+      ).catch(err => console.error("Document detection error:", err));
+
       res.write(`data: ${JSON.stringify({ type: "done", message: assistantMsg })}\n\n`);
       res.end();
     } catch (error: any) {
@@ -247,6 +313,12 @@ export async function registerRoutes(
           agentId: agent.id,
           agentName: `${agent.name} (${agent.title})`,
         });
+
+        const partyProject = session.projectId ? await storage.getProject(session.projectId) : null;
+        detectAndSaveDocument(
+          agentResponse, session.projectId, sessionId, assistantMsg.id,
+          `${agent.name} (${agent.title})`, partyProject?.phase || "analysis"
+        ).catch(err => console.error("Document detection error (party):", err));
 
         res.write(`data: ${JSON.stringify({ type: "agent_done", agentId: agent.id, message: assistantMsg })}\n\n`);
 
@@ -343,6 +415,70 @@ export async function registerRoutes(
   app.get("/api/projects/:id/workflows", async (req, res) => {
     const projectWorkflows = await storage.getWorkflowsByProject(parseInt(req.params.id));
     res.json(projectWorkflows);
+  });
+
+  // ── Documents ──
+  app.get("/api/projects/:id/documents", async (req, res) => {
+    const docs = await storage.getDocumentsByProject(parseInt(req.params.id));
+    res.json(docs);
+  });
+
+  app.get("/api/documents/:id", async (req, res) => {
+    const doc = await storage.getDocument(parseInt(req.params.id));
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+    res.json(doc);
+  });
+
+  app.post("/api/projects/:id/documents", async (req, res) => {
+    const project = await storage.getProject(parseInt(req.params.id));
+    if (!project) return res.status(404).json({ error: "Project not found" });
+    const { title, docType, content, agentName, phase, sessionId, messageId } = req.body;
+    if (!title?.trim() || !content?.trim()) return res.status(400).json({ error: "Title and content are required" });
+    const doc = await storage.createDocument({
+      projectId: parseInt(req.params.id),
+      sessionId: sessionId || null,
+      messageId: messageId || null,
+      title: title.trim(),
+      docType: docType || "general",
+      content: content.trim(),
+      agentName: agentName || null,
+      phase: phase || "analysis",
+    });
+    res.status(201).json(doc);
+  });
+
+  app.patch("/api/documents/:id", async (req, res) => {
+    const doc = await storage.getDocument(parseInt(req.params.id));
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+    const updated = await storage.updateDocument(parseInt(req.params.id), req.body);
+    res.json(updated);
+  });
+
+  app.delete("/api/documents/:id", async (req, res) => {
+    const doc = await storage.getDocument(parseInt(req.params.id));
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+    await storage.deleteDocument(parseInt(req.params.id));
+    res.status(204).send();
+  });
+
+  app.post("/api/projects/:id/scan-documents", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    const projectSessions = await storage.getSessionsByProject(projectId);
+    let found = 0;
+    for (const session of projectSessions) {
+      const msgs = await storage.getMessages(session.id);
+      for (const msg of msgs) {
+        if (msg.role === "assistant" && msg.content.length >= 200) {
+          await detectAndSaveDocument(msg.content, projectId, session.id, msg.id, msg.agentName, project.phase);
+          found++;
+        }
+      }
+    }
+    const docs = await storage.getDocumentsByProject(projectId);
+    res.json({ scanned: found, documents: docs });
   });
 
   // ── Workflows ──

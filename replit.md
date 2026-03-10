@@ -15,7 +15,12 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
 - **7 BMad Agents**: Winston (Architect), John (PM), Mary (Analyst), Sally (UX), Bob (Scrum Master), DevAI (Developer), Quinn (QA)
 - **Real-time Chat**: Streaming SSE responses from OpenAI with agent personas (project-scoped)
 - **Interactive Responses**: Agent responses with questions/choices are parsed into interactive UI (radio buttons for MC, text inputs for open-ended). Located in `client/src/components/InteractiveResponse.tsx`
-- **Party Mode**: Multiple agents collaborate and respond sequentially
+- **Party Mode**: All active agents collaborate and respond sequentially
+- **Documents Panel**: Right-side panel shows auto-detected project artifacts (product briefs, PRDs, architecture docs, etc.)
+  - Auto-detection via `DOCUMENT_PATTERNS` regex in `server/routes.ts` after each agent response
+  - Manual scan via `/api/projects/:id/scan-documents` endpoint
+  - Documents stored in `documents` table with project/session/message references
+  - Panel supports viewing full document content, deleting, and scanning existing conversations
 - **Workflow Guide**: Visual reference for the 4-phase BMad development lifecycle per project
 - **Phase Tracking**: Projects track their current BMad phase (analysis → planning → solutioning → implementation)
 
@@ -49,13 +54,15 @@ server/replit_integrations/  - OpenAI integration modules (chat, audio, image, b
 - `sessions` - Chat sessions scoped to projects (projectId FK)
 - `messages` - Chat message history with agent attribution
 - `workflows` - Workflow tracking scoped to projects (projectId FK)
+- `documents` - Auto-detected project artifacts (title, docType, content, agentName, phase, projectId, sessionId, messageId)
 
 ## Data Model
 - Projects are the top-level entity
 - Sessions belong to a project (via `projectId` column)
 - Workflows belong to a project (via `projectId` column)
+- Documents belong to a project (via `projectId` column, cascade delete)
 - Messages belong to a session
-- Deleting a project cascades to its sessions, messages, and workflows
+- Deleting a project cascades to its sessions, messages, workflows, and documents
 
 ## Environment
 - OpenAI access via `AI_INTEGRATIONS_OPENAI_BASE_URL` and `AI_INTEGRATIONS_OPENAI_API_KEY` (auto-configured)
