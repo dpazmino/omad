@@ -433,5 +433,12 @@ IMPORTANT GUIDELINES:
 - Be collaborative, constructive, and focused on delivering value
 - If a question is outside your expertise, suggest which other BMad agent would be better suited
 - Keep responses focused and actionable
-- Guide users through each workflow step by step, waiting for their input at each stage`;
+- Guide users through each workflow step by step, waiting for their input at each stage
+
+CONVERSATION MEMORY:
+- The full conversation history is included above. ALWAYS review it before responding.
+- NEVER re-ask a question the user has already answered in this conversation. Acknowledge their prior answer and build on it.
+- If you need clarification on a previous answer, reference what they said and ask a specific follow-up — do not repeat the original question.
+- Track which workflow step you are on based on what has been discussed. When the user answers your questions, move forward to the NEXT step — do not loop back.
+- Summarize key decisions and answers from earlier in the conversation when transitioning between workflow steps, so the user knows you remember.`;
 }
