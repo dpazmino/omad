@@ -132,6 +132,7 @@ export default function ProjectDetail() {
   });
 
   const [pendingCommand, setPendingCommand] = useState<{ trigger: string; sessionId: number } | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleNewSession = async () => {
     const session = await createSession(undefined, projectId);
@@ -190,10 +191,18 @@ export default function ProjectDetail() {
     setIsStreaming(true);
     setStreamingContent("");
     setPartyResponses([]);
+    setErrorMessage(null);
+
+    const handleError = (event: StreamEvent) => {
+      if (event.type === "error") {
+        setErrorMessage(event.error || "Something went wrong. Please try again.");
+      }
+    };
 
     try {
       if (partyMode) {
         await streamChat(sid, messageContent, null, true, (event: StreamEvent) => {
+          handleError(event);
           switch (event.type) {
             case "agent_start":
               setPartyResponses(prev => [...prev, { agentName: event.agentName, content: "", done: false }]);
@@ -216,11 +225,13 @@ export default function ProjectDetail() {
         });
       } else {
         await streamChat(sid, messageContent, activeAgent?.id || null, false, (event: StreamEvent) => {
+          handleError(event);
           if (event.type === "content") setStreamingContent(prev => prev + event.content);
         });
       }
     } catch (error: any) {
       console.error("Chat error:", error);
+      setErrorMessage(error.message || "Failed to send message. Please try again.");
     } finally {
       setIsStreaming(false);
       setStreamingContent("");
@@ -366,6 +377,8 @@ export default function ProjectDetail() {
             onCommand={handleCommand}
             onAgentSwitch={handleAgentSwitch}
             currentPhase={currentPhase}
+            errorMessage={errorMessage}
+            onDismissError={() => setErrorMessage(null)}
           />
         ) : (
           <WorkflowsView phase={project.phase} />
@@ -380,6 +393,7 @@ function ChatView({
   isStreaming, streamingContent, partyMode, partyResponses, input, messagesEndRef,
   onSetInput, onSetActiveSessionId, onSetPartyMode, onNewSession, onDeleteSession,
   onSend, onSendMessage, onCommand, onAgentSwitch, currentPhase,
+  errorMessage, onDismissError,
 }: {
   sessions: Session[];
   messages: ChatMessage[];
@@ -403,6 +417,8 @@ function ChatView({
   onCommand: (trigger: string) => void;
   onAgentSwitch: (id: number) => void;
   currentPhase: typeof BMAD_PHASES[0];
+  errorMessage: string | null;
+  onDismissError: () => void;
 }) {
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -603,6 +619,34 @@ function ChatView({
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {errorMessage && (
+          <div className="px-4 py-3 shrink-0 border-t border-red-500/20 bg-red-500/10 backdrop-blur-md" data-testid="error-banner">
+            <div className="max-w-4xl mx-auto flex items-center gap-3">
+              <div className="flex-1 text-sm text-red-400">
+                <span className="font-medium">Error:</span> {errorMessage}
+              </div>
+              <button
+                data-testid="button-dismiss-error"
+                onClick={onDismissError}
+                className="text-red-400/60 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
+              >
+                Dismiss
+              </button>
+              <button
+                data-testid="button-retry"
+                onClick={() => {
+                  onDismissError();
+                  const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+                  if (lastUserMsg) onSendMessage(lastUserMsg.content);
+                }}
+                className="text-xs px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 hover:text-red-200 transition-colors font-medium"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Input */}
         <div className="p-4 shrink-0 glass-panel border-t border-border/50 z-10">
