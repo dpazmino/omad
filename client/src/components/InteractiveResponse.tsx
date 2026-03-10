@@ -25,13 +25,17 @@ const CHOOSE_PROMPT = /\b(?:choose|pick|select|which|reply with)\b/i;
 const DIRECT_QUESTION = /\b(?:what|how|which|do you|would you|could you|can you|are you|have you|should|shall|tell me|share|describe|let me know|your|you)\b/i;
 const RHETORICAL_START = /^[\s]*(?:[-•]\s+)?(?:\**)?(?:substitut|combin|eliminat|revers|adapt|modif|put to other|magnif|minimi|rearrang|what if (?:we|the|it|they))\b/i;
 
+function stripTrailingParenthetical(text: string): string {
+  return text.replace(/\s*\([^)]*\)\s*$/, "").trim();
+}
+
 function isQuestionLine(text: string): boolean {
-  const stripped = text.replace(/\*{1,2}/g, "").trim();
+  const stripped = stripTrailingParenthetical(text.replace(/\*{1,2}/g, "").trim());
   return ENDS_WITH_QUESTION.test(stripped);
 }
 
 function isDirectQuestion(text: string): boolean {
-  const stripped = text.replace(/\*{1,2}/g, "").trim();
+  const stripped = stripTrailingParenthetical(text.replace(/\*{1,2}/g, "").trim());
   if (!ENDS_WITH_QUESTION.test(stripped)) return false;
   if (RHETORICAL_START.test(stripped)) return false;
   if (/^[\s]*[-•]\s+/.test(stripped)) return false;
