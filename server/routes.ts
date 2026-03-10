@@ -44,9 +44,10 @@ export async function registerRoutes(
   });
 
   // ── Sessions ──
-  app.get("/api/sessions", async (_req, res) => {
-    const sessions = await storage.getSessions();
-    res.json(sessions);
+  app.get("/api/sessions", async (req, res) => {
+    const allSessions = await storage.getSessions();
+    const globalOnly = allSessions.filter(s => !s.projectId);
+    res.json(globalOnly);
   });
 
   app.get("/api/sessions/:id", async (req, res) => {
@@ -60,6 +61,7 @@ export async function registerRoutes(
     const defaultAgent = agents.find(a => a.isDefault) || agents[0];
     const session = await storage.createSession({
       title: req.body.title || "New Session",
+      projectId: req.body.projectId || null,
       activeAgentId: defaultAgent?.id || null,
       partyMode: false,
     });
@@ -295,6 +297,54 @@ export async function registerRoutes(
       ],
     };
     res.json(help);
+  });
+
+  // ── Projects ──
+  app.get("/api/projects", async (_req, res) => {
+    const projectsList = await storage.getProjects();
+    res.json(projectsList);
+  });
+
+  app.get("/api/projects/:id", async (req, res) => {
+    const project = await storage.getProject(parseInt(req.params.id));
+    if (!project) return res.status(404).json({ error: "Project not found" });
+    res.json(project);
+  });
+
+  app.post("/api/projects", async (req, res) => {
+    const { name, description } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "Project name is required" });
+    const project = await storage.createProject({
+      name: name.trim(),
+      description: description || "",
+      status: "active",
+      phase: "analysis",
+    });
+    res.status(201).json(project);
+  });
+
+  app.patch("/api/projects/:id", async (req, res) => {
+    const existing = await storage.getProject(parseInt(req.params.id));
+    if (!existing) return res.status(404).json({ error: "Project not found" });
+    const updated = await storage.updateProject(parseInt(req.params.id), req.body);
+    res.json(updated);
+  });
+
+  app.delete("/api/projects/:id", async (req, res) => {
+    const existing = await storage.getProject(parseInt(req.params.id));
+    if (!existing) return res.status(404).json({ error: "Project not found" });
+    await storage.deleteProject(parseInt(req.params.id));
+    res.status(204).send();
+  });
+
+  app.get("/api/projects/:id/sessions", async (req, res) => {
+    const projectSessions = await storage.getSessionsByProject(parseInt(req.params.id));
+    res.json(projectSessions);
+  });
+
+  app.get("/api/projects/:id/workflows", async (req, res) => {
+    const projectWorkflows = await storage.getWorkflowsByProject(parseInt(req.params.id));
+    res.json(projectWorkflows);
   });
 
   // ── Workflows ──

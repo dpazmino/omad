@@ -11,38 +11,49 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
 - **Styling**: Dark theme with glassmorphism ("Dark Future" aesthetic)
 
 ## Key Features
+- **Projects**: Central organizing concept — each project has its own sessions, workflows, and phase tracking
 - **7 BMad Agents**: Winston (Architect), John (PM), Mary (Analyst), Sally (UX), Bob (Scrum Master), DevAI (Developer), Quinn (QA)
-- **Real-time Chat**: Streaming SSE responses from OpenAI with agent personas
+- **Real-time Chat**: Streaming SSE responses from OpenAI with agent personas (project-scoped)
 - **Party Mode**: Multiple agents collaborate and respond sequentially
-- **Session Management**: Persistent chat sessions with message history
-- **Workflow Guide**: Visual reference for the 4-phase BMad development lifecycle
+- **Workflow Guide**: Visual reference for the 4-phase BMad development lifecycle per project
+- **Phase Tracking**: Projects track their current BMad phase (analysis → planning → solutioning → implementation)
 
 ## File Structure
 ```
 client/src/
-  pages/Home.tsx          - Main chat interface with streaming
+  pages/Home.tsx          - Main chat interface (standalone, no project)
   pages/Agents.tsx        - Agent team dashboard
-  pages/Workflows.tsx     - BMad workflow reference
+  pages/Workflows.tsx     - BMad workflow reference (global)
+  pages/Projects.tsx      - Project listing dashboard
+  pages/ProjectDetail.tsx - Project detail with chat + workflows tabs
   components/layout/      - Sidebar, Layout
   lib/api.ts              - API client functions
 
 server/
-  routes.ts               - API routes (agents, sessions, chat, workflows)
+  routes.ts               - API routes (agents, sessions, chat, workflows, projects)
   storage.ts              - Database storage layer (Drizzle)
   agents.ts               - BMad agent definitions and system prompts
   db.ts                   - Database connection
 
 shared/
-  schema.ts               - Drizzle schema (agents, sessions, messages, workflows)
+  schema.ts               - Drizzle schema (agents, sessions, messages, workflows, projects)
 
 server/replit_integrations/  - OpenAI integration modules (chat, audio, image, batch)
 ```
 
 ## Database Tables
 - `agents` - BMad agent configurations (name, persona, model, commands)
-- `sessions` - Chat sessions with active agent and party mode toggle
+- `projects` - Development projects (name, description, status, phase)
+- `sessions` - Chat sessions scoped to projects (projectId FK)
 - `messages` - Chat message history with agent attribution
-- `workflows` - Workflow tracking (status, steps, phase)
+- `workflows` - Workflow tracking scoped to projects (projectId FK)
+
+## Data Model
+- Projects are the top-level entity
+- Sessions belong to a project (via `projectId` column)
+- Workflows belong to a project (via `projectId` column)
+- Messages belong to a session
+- Deleting a project cascades to its sessions, messages, and workflows
 
 ## Environment
 - OpenAI access via `AI_INTEGRATIONS_OPENAI_BASE_URL` and `AI_INTEGRATIONS_OPENAI_API_KEY` (auto-configured)
@@ -51,3 +62,7 @@ server/replit_integrations/  - OpenAI integration modules (chat, audio, image, b
 
 ## Fonts
 - Outfit (headings), Inter (body), JetBrains Mono (code)
+
+## Important Notes
+- `Link` from wouter renders an `<a>` — do NOT wrap it in another `<a>` tag
+- Sidebar nav order: Projects, Chat, Agents, Workflows

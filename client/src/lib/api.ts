@@ -1,4 +1,4 @@
-import type { Agent, Session, ChatMessage } from "@shared/schema";
+import type { Agent, Session, ChatMessage, Project } from "@shared/schema";
 
 const API = "/api";
 
@@ -14,11 +14,11 @@ export async function fetchSessions(): Promise<Session[]> {
   return res.json();
 }
 
-export async function createSession(title?: string): Promise<Session> {
+export async function createSession(title?: string, projectId?: number): Promise<Session> {
   const res = await fetch(`${API}/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ title, projectId }),
   });
   if (!res.ok) throw new Error("Failed to create session");
   return res.json();
@@ -42,6 +42,48 @@ export async function fetchMessages(sessionId: number): Promise<ChatMessage[]> {
   const res = await fetch(`${API}/sessions/${sessionId}/messages`);
   if (!res.ok) throw new Error("Failed to fetch messages");
   return res.json();
+}
+
+export async function fetchProjectSessions(projectId: number): Promise<Session[]> {
+  const res = await fetch(`${API}/projects/${projectId}/sessions`);
+  if (!res.ok) throw new Error("Failed to fetch project sessions");
+  return res.json();
+}
+
+export async function fetchProjectWorkflows(projectId: number): Promise<any[]> {
+  const res = await fetch(`${API}/projects/${projectId}/workflows`);
+  if (!res.ok) throw new Error("Failed to fetch project workflows");
+  return res.json();
+}
+
+export async function fetchProjects(): Promise<Project[]> {
+  const res = await fetch(`${API}/projects`);
+  if (!res.ok) throw new Error("Failed to fetch projects");
+  return res.json();
+}
+
+export async function createProject(data: { name: string; description?: string }): Promise<Project> {
+  const res = await fetch(`${API}/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create project");
+  return res.json();
+}
+
+export async function updateProject(id: number, data: Partial<Project>): Promise<Project> {
+  const res = await fetch(`${API}/projects/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update project");
+  return res.json();
+}
+
+export async function deleteProject(id: number): Promise<void> {
+  await fetch(`${API}/projects/${id}`, { method: "DELETE" });
 }
 
 export async function fetchBmadHelp(): Promise<any> {

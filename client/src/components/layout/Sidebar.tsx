@@ -4,15 +4,16 @@ import {
   Bot, 
   MessageSquare, 
   GitBranch, 
-  Settings, 
   Users, 
   Sparkles,
   Menu,
-  X
+  X,
+  FolderKanban
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
+  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/", label: "Chat", icon: MessageSquare },
   { href: "/agents", label: "Agents", icon: Users },
   { href: "/workflows", label: "Workflows", icon: GitBranch },

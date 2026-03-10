@@ -20,9 +20,20 @@ export const agents = pgTable("agents", {
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
+export const projects = pgTable("projects", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status").notNull().default("active"),
+  phase: text("phase").notNull().default("analysis"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
 export const sessions = pgTable("sessions", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
+  projectId: integer("project_id").references(() => projects.id, { onDelete: "cascade" }),
   activeAgentId: integer("active_agent_id").references(() => agents.id),
   partyMode: boolean("party_mode").notNull().default(false),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
@@ -41,6 +52,7 @@ export const messages = pgTable("messages", {
 
 export const workflows = pgTable("workflows", {
   id: serial("id").primaryKey(),
+  projectId: integer("project_id").references(() => projects.id, { onDelete: "cascade" }),
   sessionId: integer("session_id").references(() => sessions.id),
   title: text("title").notNull(),
   description: text("description").notNull(),
@@ -55,6 +67,7 @@ export const insertAgentSchema = createInsertSchema(agents).omit({ id: true, cre
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type Agent = typeof agents.$inferSelect;
 export type InsertAgent = z.infer<typeof insertAgentSchema>;
@@ -64,3 +77,5 @@ export type ChatMessage = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Workflow = typeof workflows.$inferSelect;
 export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
+export type Project = typeof projects.$inferSelect;
+export type InsertProject = z.infer<typeof insertProjectSchema>;

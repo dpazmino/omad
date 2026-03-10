@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { agents, sessions, messages, workflows, type Agent, type InsertAgent, type Session, type InsertSession, type ChatMessage, type InsertMessage, type Workflow, type InsertWorkflow } from "@shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { agents, sessions, messages, workflows, projects, type Agent, type InsertAgent, type Session, type InsertSession, type ChatMessage, type InsertMessage, type Workflow, type InsertWorkflow, type Project, type InsertProject } from "@shared/schema";
+import { eq, desc, sql, and } from "drizzle-orm";
 
 export interface IStorage {
   getAgents(): Promise<Agent[]>;
@@ -9,6 +9,7 @@ export interface IStorage {
   updateAgent(id: number, agent: Partial<InsertAgent>): Promise<Agent>;
 
   getSessions(): Promise<Session[]>;
+  getSessionsByProject(projectId: number): Promise<Session[]>;
   getSession(id: number): Promise<Session | undefined>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: number, data: Partial<InsertSession>): Promise<Session>;
@@ -19,8 +20,15 @@ export interface IStorage {
 
   getWorkflows(): Promise<Workflow[]>;
   getWorkflowsBySession(sessionId: number): Promise<Workflow[]>;
+  getWorkflowsByProject(projectId: number): Promise<Workflow[]>;
   createWorkflow(workflow: InsertWorkflow): Promise<Workflow>;
   updateWorkflow(id: number, data: Partial<InsertWorkflow>): Promise<Workflow>;
+
+  getProjects(): Promise<Project[]>;
+  getProject(id: number): Promise<Project | undefined>;
+  createProject(project: InsertProject): Promise<Project>;
+  updateProject(id: number, data: Partial<InsertProject>): Promise<Project>;
+  deleteProject(id: number): Promise<void>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -45,6 +53,10 @@ class DatabaseStorage implements IStorage {
 
   async getSessions(): Promise<Session[]> {
     return db.select().from(sessions).orderBy(desc(sessions.updatedAt));
+  }
+
+  async getSessionsByProject(projectId: number): Promise<Session[]> {
+    return db.select().from(sessions).where(eq(sessions.projectId, projectId)).orderBy(desc(sessions.updatedAt));
   }
 
   async getSession(id: number): Promise<Session | undefined> {
@@ -84,6 +96,10 @@ class DatabaseStorage implements IStorage {
     return db.select().from(workflows).where(eq(workflows.sessionId, sessionId)).orderBy(workflows.createdAt);
   }
 
+  async getWorkflowsByProject(projectId: number): Promise<Workflow[]> {
+    return db.select().from(workflows).where(eq(workflows.projectId, projectId)).orderBy(workflows.createdAt);
+  }
+
   async createWorkflow(workflow: InsertWorkflow): Promise<Workflow> {
     const [created] = await db.insert(workflows).values(workflow).returning();
     return created;
@@ -92,6 +108,35 @@ class DatabaseStorage implements IStorage {
   async updateWorkflow(id: number, data: Partial<InsertWorkflow>): Promise<Workflow> {
     const [updated] = await db.update(workflows).set({ ...data, updatedAt: sql`CURRENT_TIMESTAMP` }).where(eq(workflows.id, id)).returning();
     return updated;
+  }
+
+  async getProjects(): Promise<Project[]> {
+    return db.select().from(projects).orderBy(desc(projects.updatedAt));
+  }
+
+  async getProject(id: number): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    return project;
+  }
+
+  async createProject(project: InsertProject): Promise<Project> {
+    const [created] = await db.insert(projects).values(project).returning();
+    return created;
+  }
+
+  async updateProject(id: number, data: Partial<InsertProject>): Promise<Project> {
+    const [updated] = await db.update(projects).set({ ...data, updatedAt: sql`CURRENT_TIMESTAMP` }).where(eq(projects.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProject(id: number): Promise<void> {
+    const projectSessions = await db.select().from(sessions).where(eq(sessions.projectId, id));
+    for (const s of projectSessions) {
+      await db.delete(messages).where(eq(messages.sessionId, s.id));
+    }
+    await db.delete(sessions).where(eq(sessions.projectId, id));
+    await db.delete(workflows).where(eq(workflows.projectId, id));
+    await db.delete(projects).where(eq(projects.id, id));
   }
 }
 
