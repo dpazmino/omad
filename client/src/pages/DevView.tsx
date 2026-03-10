@@ -349,23 +349,32 @@ function StoryPromptEditor({ story, epic, promptDraft, onPromptChange, onSave, o
         </div>
       </div>
 
-      <div className="border-b border-border bg-background px-4 py-3 shrink-0 space-y-2">
-        <div className="prose prose-sm max-w-none">
-          <p className="text-sm text-foreground"><strong>Description:</strong> {story.description || "—"}</p>
-        </div>
-        {story.acceptanceCriteria && (
-          <details className="text-sm">
-            <summary className="text-xs font-medium text-muted-foreground cursor-pointer">Acceptance Criteria</summary>
-            <div className="prose prose-sm max-w-none mt-1 pl-2 border-l-2 border-border">
-              <ReactMarkdown>{story.acceptanceCriteria}</ReactMarkdown>
+      <details className="border-b border-border bg-background px-4 py-2 shrink-0">
+        <summary className="text-xs font-medium text-muted-foreground cursor-pointer flex items-center gap-1">
+          <ChevronRight size={12} className="details-chevron transition-transform" />
+          Story Details (Description &amp; Acceptance Criteria)
+        </summary>
+        <div className="mt-2 space-y-2 pb-2 max-h-[200px] overflow-auto">
+          <div className="prose prose-sm max-w-none">
+            <p className="text-sm text-foreground"><strong>Description:</strong> {story.description || "—"}</p>
+          </div>
+          {story.acceptanceCriteria && (
+            <div className="text-sm">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Acceptance Criteria:</p>
+              <div className="prose prose-sm max-w-none pl-2 border-l-2 border-border">
+                <ReactMarkdown>{story.acceptanceCriteria}</ReactMarkdown>
+              </div>
             </div>
-          </details>
-        )}
-      </div>
+          )}
+        </div>
+      </details>
 
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="px-4 py-2 border-b border-border bg-background">
-          <label className="text-xs font-medium text-muted-foreground">Implementation Prompt for Claude Code</label>
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        <div className="px-4 py-2 border-b border-border bg-primary/5">
+          <label className="text-sm font-semibold text-primary flex items-center gap-2">
+            <Sparkles size={14} />
+            Write Your Claude Code Prompt Below
+          </label>
         </div>
         {showPreview ? (
           <div className="flex-1 overflow-auto p-4">
@@ -378,8 +387,9 @@ function StoryPromptEditor({ story, epic, promptDraft, onPromptChange, onSave, o
             data-testid="textarea-story-prompt"
             value={promptDraft}
             onChange={e => onPromptChange(e.target.value)}
-            placeholder={"Describe what Claude Code should implement for this story.\n\nExample:\n- Implement the API endpoint for...\n- Add a React component that...\n- Update the database schema to...\n- Write tests for..."}
-            className="flex-1 w-full px-4 py-3 bg-background text-sm text-foreground outline-none resize-none font-mono leading-relaxed"
+            autoFocus
+            placeholder={"Start typing your implementation prompt here...\n\nExample:\n- Implement the API endpoint for...\n- Add a React component that...\n- Update the database schema to...\n- Write tests for..."}
+            className="flex-1 w-full px-4 py-3 bg-background text-sm text-foreground outline-none resize-none font-mono leading-relaxed border-l-4 border-primary/20"
           />
         )}
       </div>
