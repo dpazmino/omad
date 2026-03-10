@@ -16,12 +16,112 @@ interface ParsedContent {
   closing: string;
 }
 
-const MC_OPTION = /^[\s]*[-•*]?\s*\**([a-eA-E])\s*[).:\]]\**\s+(.+)/;
+const LETTER_OPTION = /^[\s]*[-•*]?\s*\**([a-eA-E])\s*[).:\]]\**\s+(.+)/;
+const NUMBERED_OPTION = /^[\s]*(\d+)\s*[).]\s*\**(.+?)\**\s*$/;
+const DASH_OPTION = /^[\s]*[-•]\s+\**(.+?)\**\s*(?:\(.*\))?\s*$/;
 const ENDS_WITH_QUESTION = /\?\s*\**\s*$/;
+const CHOOSE_PROMPT = /\b(?:choose|pick|select|which|reply with)\b/i;
 
 function isQuestionLine(text: string): boolean {
   const stripped = text.replace(/\*{1,2}/g, "").trim();
   return ENDS_WITH_QUESTION.test(stripped);
+}
+
+function isChoosePrompt(text: string): boolean {
+  const stripped = text.replace(/\*{1,2}/g, "").trim();
+  return CHOOSE_PROMPT.test(stripped);
+}
+
+function collectLetterOptions(lines: string[], startIdx: number): { options: { label: string; text: string }[]; endIdx: number } {
+  const options: { label: string; text: string }[] = [];
+  let idx = startIdx;
+  while (idx < lines.length) {
+    const match = lines[idx].trim().match(LETTER_OPTION);
+    if (match) {
+      options.push({ label: match[1].toUpperCase(), text: match[2].replace(/\*{1,2}/g, "").trim() });
+      idx++;
+    } else {
+      break;
+    }
+  }
+  return { options, endIdx: idx };
+}
+
+function collectNumberedOptions(lines: string[], startIdx: number): { options: { label: string; text: string }[]; endIdx: number } {
+  const options: { label: string; text: string }[] = [];
+  let idx = startIdx;
+  while (idx < lines.length) {
+    const trimmed = lines[idx].trim();
+    if (trimmed === "") { idx++; break; }
+    const match = trimmed.match(NUMBERED_OPTION);
+    if (match) {
+      options.push({ label: match[1], text: match[2].replace(/\*{1,2}/g, "").replace(/\s*[-–—]\s*$/, "").trim() });
+      idx++;
+    } else {
+      break;
+    }
+  }
+  return { options, endIdx: idx };
+}
+
+function collectDashOptions(lines: string[], startIdx: number): { options: { label: string; text: string }[]; endIdx: number } {
+  const options: { label: string; text: string }[] = [];
+  let idx = startIdx;
+  while (idx < lines.length) {
+    const trimmed = lines[idx].trim();
+    if (trimmed === "") { idx++; break; }
+    const match = trimmed.match(DASH_OPTION);
+    if (match && !trimmed.match(LETTER_OPTION)) {
+      const label = String.fromCharCode(65 + options.length);
+      options.push({ label, text: match[1].replace(/\*{1,2}/g, "").trim() });
+      idx++;
+    } else {
+      break;
+    }
+  }
+  return { options, endIdx: idx };
+}
+
+function findPromptAbove(bucket: string[]): string {
+  for (let j = bucket.length - 1; j >= 0; j--) {
+    const t = bucket[j].trim();
+    if (t !== "") {
+      return t.replace(/\*{1,2}/g, "").replace(/^\s*(?:#{1,4}\s+)?/, "").trim();
+    }
+  }
+  return "";
+}
+
+function removePromptAbove(bucket: string[]): void {
+  for (let j = bucket.length - 1; j >= 0; j--) {
+    if (bucket[j].trim() !== "") {
+      bucket.splice(j);
+      return;
+    }
+  }
+}
+
+function hasChoiceListAhead(lines: string[], idx: number): "letter" | "numbered" | "dash" | null {
+  for (let j = idx; j < lines.length && j < idx + 3; j++) {
+    const t = lines[j].trim();
+    if (t === "") continue;
+    if (t.match(LETTER_OPTION)) return "letter";
+    if (t.match(NUMBERED_OPTION)) return "numbered";
+    if (t.match(DASH_OPTION) && !t.match(LETTER_OPTION)) return "dash";
+    return null;
+  }
+  return null;
+}
+
+function isShortChoiceList(lines: string[], startIdx: number): boolean {
+  let count = 0;
+  for (let j = startIdx; j < lines.length; j++) {
+    const t = lines[j].trim();
+    if (t === "") break;
+    if (t.match(NUMBERED_OPTION)) count++;
+    else break;
+  }
+  return count >= 2 && count <= 8;
 }
 
 function parseAgentResponse(content: string): ParsedContent | null {
@@ -32,83 +132,84 @@ function parseAgentResponse(content: string): ParsedContent | null {
 
   let i = 0;
   let foundInteractive = false;
+  const currentBucket = () => foundInteractive ? closingLines : preambleLines;
 
   while (i < lines.length) {
     const trimmed = lines[i].trim();
 
-    const mcMatch = trimmed.match(MC_OPTION);
-    if (mcMatch) {
-      const options: { label: string; text: string }[] = [];
-      let questionPrompt = "";
-
-      if (!foundInteractive && preambleLines.length > 0) {
-        for (let j = preambleLines.length - 1; j >= 0; j--) {
-          if (preambleLines[j].trim() !== "") {
-            questionPrompt = preambleLines[j].replace(/\*{1,2}/g, "").replace(/^\s*\d+\s*[).:]?\s*/, "").trim();
-            preambleLines.splice(j);
-            break;
-          }
-        }
-      } else if (foundInteractive && closingLines.length > 0) {
-        for (let j = closingLines.length - 1; j >= 0; j--) {
-          if (closingLines[j].trim() !== "") {
-            questionPrompt = closingLines[j].replace(/\*{1,2}/g, "").replace(/^\s*\d+\s*[).:]?\s*/, "").trim();
-            closingLines.splice(j);
-            break;
-          }
-        }
-      }
-
-      while (i < lines.length) {
-        const optMatch = lines[i].trim().match(MC_OPTION);
-        if (optMatch) {
-          options.push({ label: optMatch[1].toUpperCase(), text: optMatch[2].replace(/\*{1,2}/g, "").trim() });
-          i++;
-        } else {
-          break;
-        }
-      }
-
+    if (trimmed.match(LETTER_OPTION)) {
+      const prompt = findPromptAbove(currentBucket());
+      removePromptAbove(currentBucket());
+      const { options, endIdx } = collectLetterOptions(lines, i);
       if (options.length >= 2) {
         foundInteractive = true;
         questions.push({
           id: questions.length + 1,
-          prompt: questionPrompt || "Select an option:",
+          prompt: prompt || "Select an option:",
           type: "multiple-choice",
           options,
         });
       }
+      i = endIdx;
       continue;
     }
 
-    if (isQuestionLine(trimmed) && trimmed.length > 10) {
-      const cleanPrompt = trimmed.replace(/\*{1,2}/g, "").replace(/^[\s]*(?:#{1,4}\s+)?(?:\d+\s*[).:]?\s*)?/, "").trim();
-
-      let hasOptionsAfter = false;
-      for (let j = i + 1; j < lines.length && j <= i + 8; j++) {
-        if (lines[j].trim().match(MC_OPTION)) {
-          hasOptionsAfter = true;
-          break;
+    if (trimmed.match(NUMBERED_OPTION) && isShortChoiceList(lines, i)) {
+      const prompt = findPromptAbove(currentBucket());
+      const promptIsChoose = isChoosePrompt(prompt) || isQuestionLine(prompt);
+      if (promptIsChoose) {
+        removePromptAbove(currentBucket());
+        const { options, endIdx } = collectNumberedOptions(lines, i);
+        if (options.length >= 2) {
+          foundInteractive = true;
+          questions.push({
+            id: questions.length + 1,
+            prompt: prompt || "Select an option:",
+            type: "multiple-choice",
+            options,
+          });
         }
-      }
-
-      if (!hasOptionsAfter && cleanPrompt.length > 10) {
-        foundInteractive = true;
-        questions.push({
-          id: questions.length + 1,
-          prompt: cleanPrompt,
-          type: "open-ended",
-        });
-        i++;
+        i = endIdx;
         continue;
       }
     }
 
-    if (foundInteractive) {
-      closingLines.push(lines[i]);
-    } else {
-      preambleLines.push(lines[i]);
+    if ((isQuestionLine(trimmed) || isChoosePrompt(trimmed)) && trimmed.length > 10) {
+      const choiceType = hasChoiceListAhead(lines, i + 1);
+
+      if (choiceType === "dash") {
+        const cleanPrompt = trimmed.replace(/\*{1,2}/g, "").replace(/^[\s]*(?:#{1,4}\s+)?/, "").trim();
+        i++;
+        const { options, endIdx } = collectDashOptions(lines, i);
+        if (options.length >= 2 && options.length <= 8) {
+          foundInteractive = true;
+          questions.push({
+            id: questions.length + 1,
+            prompt: cleanPrompt,
+            type: "multiple-choice",
+            options,
+          });
+          i = endIdx;
+          continue;
+        }
+      }
+
+      if (!choiceType && isQuestionLine(trimmed)) {
+        const cleanPrompt = trimmed.replace(/\*{1,2}/g, "").replace(/^[\s]*(?:#{1,4}\s+)?(?:\d+\s*[).:]?\s*)?/, "").trim();
+        if (cleanPrompt.length > 10) {
+          foundInteractive = true;
+          questions.push({
+            id: questions.length + 1,
+            prompt: cleanPrompt,
+            type: "open-ended",
+          });
+          i++;
+          continue;
+        }
+      }
     }
+
+    currentBucket().push(lines[i]);
     i++;
   }
 
@@ -156,7 +257,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
       const answer = answers[q.id];
       if (q.type === "multiple-choice") {
         const chosen = q.options?.find(o => o.label === answer);
-        parts.push(`${q.prompt}\nAnswer: ${answer}) ${chosen?.text || ""}`);
+        parts.push(`${q.prompt}\nAnswer: ${chosen?.text || answer}`);
       } else {
         parts.push(`${q.prompt}\nAnswer: ${answer}`);
       }
