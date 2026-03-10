@@ -80,7 +80,7 @@ type Tab = "chat" | "workflows";
 
 const COMMAND_PREREQUISITES: Record<string, { requires: string[]; label: string }> = {
   MR: { requires: ["brainstorm"], label: "Brainstorm Summary" },
-  CB: { requires: ["brainstorm"], label: "Brainstorm Summary" },
+  CB: { requires: ["brainstorm", "market-research"], label: "Brainstorm Summary + Market Research" },
   CP: { requires: ["product-brief"], label: "Product Brief" },
   VP: { requires: ["prd"], label: "PRD" },
   CU: { requires: ["prd"], label: "PRD" },
