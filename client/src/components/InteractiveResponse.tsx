@@ -204,6 +204,9 @@ function parseAgentResponse(content: string): ParsedContent | null {
             type: "open-ended",
           });
           i++;
+          while (i < lines.length && lines[i].trim().startsWith("(") && lines[i].trim().endsWith(")")) {
+            i++;
+          }
           continue;
         }
       }
@@ -213,7 +216,34 @@ function parseAgentResponse(content: string): ParsedContent | null {
     i++;
   }
 
-  if (questions.length === 0) return null;
+  if (questions.length === 0) {
+    const allLines = content.split("\n");
+    let lastQuestionLine = -1;
+    for (let j = allLines.length - 1; j >= 0; j--) {
+      const t = allLines[j].trim();
+      if (t === "") continue;
+      if (t.startsWith("(") && t.endsWith(")")) continue;
+      if (ENDS_WITH_QUESTION.test(t.replace(/\*{1,2}/g, "").trim())) {
+        lastQuestionLine = j;
+      }
+      break;
+    }
+    if (lastQuestionLine >= 0) {
+      const questionText = allLines[lastQuestionLine].replace(/\*{1,2}/g, "").replace(/^[\s]*(?:#{1,4}\s+)?/, "").trim();
+      if (questionText.length > 15) {
+        return {
+          preamble: allLines.slice(0, lastQuestionLine).join("\n").trim(),
+          questions: [{
+            id: 1,
+            prompt: questionText,
+            type: "open-ended",
+          }],
+          closing: allLines.slice(lastQuestionLine + 1).filter(l => !(l.trim().startsWith("(") && l.trim().endsWith(")"))).join("\n").trim(),
+        };
+      }
+    }
+    return null;
+  }
 
   const hasRealQuestions = questions.some(q =>
     q.type === "multiple-choice" ||
