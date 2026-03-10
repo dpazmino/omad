@@ -190,6 +190,7 @@ export async function registerRoutes(
         stream = anthropic.messages.stream({
           model: agent.model || "claude-sonnet-4-6",
           max_tokens: 8192,
+          temperature: 0.1,
           system: systemPrompt,
           messages: chatMessages,
         });
@@ -294,6 +295,7 @@ export async function registerRoutes(
           agentStream = anthropic.messages.stream({
             model: agent.model || "claude-sonnet-4-6",
             max_tokens: 8192,
+            temperature: 0.1,
             system: partySystemPrompt,
             messages: baseHistory,
           });
