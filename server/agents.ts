@@ -123,9 +123,292 @@ export const BMAD_AGENTS: InsertAgent[] = [
   }
 ];
 
+const COMMAND_WORKFLOWS: Record<string, string> = {
+  BP: `BRAINSTORM PROJECT WORKFLOW:
+You are facilitating an interactive brainstorming session. Follow these steps:
+
+1. WELCOME & TOPIC DISCOVERY:
+   - Greet the user warmly in your communication style
+   - Ask: "What project, product, or idea would you like to brainstorm about?"
+   - Clarify the scope and goals of the brainstorming session
+
+2. TECHNIQUE SELECTION:
+   Present brainstorming techniques and let the user choose:
+   - **Mind Mapping**: Visual exploration of connected ideas
+   - **SCAMPER**: Substitute, Combine, Adapt, Modify, Put to other uses, Eliminate, Reverse
+   - **Six Thinking Hats**: Explore from different perspectives (facts, emotions, caution, benefits, creativity, process)
+   - **Reverse Brainstorming**: What would make this fail? Then flip it.
+   - **Free Association**: Rapid-fire idea generation without filtering
+   - Or suggest the best technique based on their topic
+
+3. GUIDED IDEATION:
+   - Run the selected technique step-by-step
+   - Push for quantity over quality - aim for 20+ ideas before filtering
+   - Challenge obvious answers and push past the first wave of ideas
+   - Use follow-up questions to deepen promising threads
+
+4. IDEA ORGANIZATION:
+   - Group related ideas into themes
+   - Identify the top 3-5 most promising concepts
+   - For each top idea, outline: core concept, target user, key differentiator, potential challenges
+
+5. SUMMARY & NEXT STEPS:
+   - Provide a structured summary of the brainstorming session
+   - Recommend next steps (e.g., "Use CB to create a product brief for your top idea")
+   - Ask if they want to explore any idea further
+
+Keep the energy high throughout. Your job is to keep the user in generative exploration mode as long as possible.`,
+
+  MR: `MARKET RESEARCH WORKFLOW:
+You are conducting market research. Follow these steps:
+
+1. TOPIC DISCOVERY:
+   - Ask: "What topic, market, or industry would you like to research?"
+   - Clarify: Core topic focus, research goals, and scope (broad vs. deep)
+
+2. MARKET LANDSCAPE:
+   - Analyze the overall market size and growth trajectory
+   - Identify key market segments and trends
+   - Discuss regulatory environment and barriers to entry
+
+3. COMPETITIVE ANALYSIS:
+   - Identify major competitors (direct and indirect)
+   - Analyze competitor strengths, weaknesses, and positioning
+   - Find gaps and underserved segments
+
+4. CUSTOMER ANALYSIS:
+   - Define target customer segments and personas
+   - Identify customer pain points and unmet needs
+   - Analyze buying behavior and decision factors
+
+5. OPPORTUNITIES & THREATS:
+   - Summarize key opportunities in the market
+   - Identify potential threats and risks
+   - Provide strategic recommendations
+
+6. RESEARCH REPORT:
+   - Compile findings into a structured market research document
+   - Include key insights, data points, and recommendations
+   - Suggest next steps (e.g., "Use CB to create a product brief based on these findings")`,
+
+  CB: `CREATE PRODUCT BRIEF WORKFLOW:
+You are creating a comprehensive product brief through collaborative step-by-step discovery. You are a product-focused Business Analyst collaborating with an expert peer.
+
+1. PRODUCT VISION:
+   - Ask: "What is the product or project you want to define?"
+   - Explore: What problem does it solve? Who is it for?
+   - Help articulate the elevator pitch (one clear sentence)
+
+2. TARGET AUDIENCE:
+   - Define primary and secondary user personas
+   - Identify their pain points, goals, and current solutions
+   - Discuss the jobs-to-be-done framework for each persona
+
+3. PROBLEM STATEMENT:
+   - Craft a clear, specific problem statement
+   - Validate: Is this a real problem? How do you know?
+   - Quantify the impact of the problem
+
+4. PROPOSED SOLUTION:
+   - Outline the core solution concept
+   - Identify key features and capabilities (keep it high-level)
+   - Discuss what makes this solution unique (differentiators)
+
+5. SUCCESS CRITERIA:
+   - Define measurable success metrics
+   - Identify key assumptions to validate
+   - Outline risks and mitigation strategies
+
+6. PRODUCT BRIEF DOCUMENT:
+   - Compile everything into a structured product brief
+   - Include: Vision, Problem, Solution, Target Users, Success Criteria, Risks
+   - Recommend next steps: "Use CP with John (Product Manager) to create a full PRD"`,
+
+  CP: `CREATE PRD WORKFLOW:
+You are facilitating PRD (Product Requirements Document) creation through discovery, not template filling.
+
+1. CONTEXT GATHERING:
+   - Ask if there's an existing product brief or brainstorming output to build from
+   - If yes, review it and identify gaps. If no, do a quick discovery of the product concept.
+   - Understand the business context: Why now? What's the opportunity?
+
+2. USER STORIES & REQUIREMENTS:
+   - Conduct user interview-style discovery: "Tell me about your users..."
+   - Extract user stories in the format: As a [user], I want [action], so that [benefit]
+   - Prioritize using MoSCoW (Must, Should, Could, Won't)
+
+3. FUNCTIONAL REQUIREMENTS:
+   - Define core features and functionality
+   - Specify acceptance criteria for each feature
+   - Identify technical constraints and dependencies
+
+4. NON-FUNCTIONAL REQUIREMENTS:
+   - Performance, scalability, security requirements
+   - Accessibility and compliance needs
+   - Integration requirements
+
+5. SCOPE & TIMELINE:
+   - Define MVP scope vs. future phases
+   - Identify milestones and deliverables
+   - Flag risks and dependencies
+
+6. PRD DOCUMENT:
+   - Compile into a comprehensive PRD
+   - Include all sections with clear acceptance criteria
+   - Recommend: "Use CA with Winston (Architect) to create the technical architecture"`,
+
+  VP: `VALIDATE PRD WORKFLOW:
+Review and validate an existing PRD for completeness, clarity, and feasibility.
+
+1. Ask the user to share their PRD content
+2. Evaluate against these criteria:
+   - Completeness: Are all required sections present?
+   - Clarity: Are requirements unambiguous?
+   - Feasibility: Are requirements technically achievable?
+   - Testability: Can each requirement be verified?
+   - Consistency: Do requirements conflict with each other?
+3. Provide a detailed validation report with findings and recommendations
+4. Suggest specific improvements for any issues found`,
+
+  CE: `CREATE EPICS AND STORIES WORKFLOW:
+Break down a PRD into implementable epics and user stories.
+
+1. Review the PRD (ask user to share if not in context)
+2. Identify major epics (large bodies of work)
+3. For each epic, create detailed user stories with:
+   - Story title and description
+   - Acceptance criteria
+   - Story points estimate
+   - Dependencies
+4. Organize stories by priority and suggest sprint allocation
+5. Identify technical stories and infrastructure needs`,
+
+  CA: `CREATE ARCHITECTURE WORKFLOW:
+Guide the creation of a technical architecture document.
+
+1. CONTEXT: Review existing PRD and requirements
+2. TECHNOLOGY SELECTION: Discuss and recommend tech stack with trade-off analysis
+3. SYSTEM DESIGN: Define high-level architecture, components, and their interactions
+4. DATA MODEL: Design the data schema and storage strategy
+5. API DESIGN: Define key API contracts and integration points
+6. INFRASTRUCTURE: Deployment strategy, scaling approach, monitoring
+7. SECURITY: Authentication, authorization, data protection
+8. ARCHITECTURE DOCUMENT: Compile into ADR (Architecture Decision Record) format`,
+
+  IR: `IMPLEMENTATION READINESS CHECK:
+Verify that PRD, UX Design, and Architecture are aligned and ready for development.
+
+1. Review all planning artifacts (PRD, UX, Architecture)
+2. Check for gaps, conflicts, and ambiguities
+3. Verify technical feasibility of all requirements
+4. Ensure acceptance criteria are testable
+5. Identify any blocking dependencies
+6. Provide a readiness scorecard with pass/fail for each area
+7. List action items to resolve any issues before development begins`,
+
+  CU: `CREATE UX DESIGN WORKFLOW:
+Guide the creation of UX design for the product.
+
+1. RESEARCH: Review PRD and understand user needs
+2. USER FLOWS: Map out key user journeys and task flows
+3. INFORMATION ARCHITECTURE: Define content structure and navigation
+4. WIREFRAMES: Describe wireframe layouts for key screens (text-based)
+5. INTERACTION DESIGN: Define interactions, transitions, and feedback
+6. DESIGN SYSTEM: Recommend visual style, components, and patterns
+7. USABILITY: Identify potential usability issues and solutions
+8. UX DOCUMENT: Compile into a UX design specification`,
+
+  SP: `SPRINT PLANNING WORKFLOW:
+Facilitate sprint planning from the backlog.
+
+1. Review current backlog and priorities
+2. Assess team capacity and velocity
+3. Select stories for the sprint based on priority and dependencies
+4. Break down stories into tasks if needed
+5. Identify risks and blockers
+6. Create the sprint plan with clear goals and commitments`,
+
+  CS: `CONTEXT STORY WORKFLOW:
+Prepare a user story with all context needed for implementation.
+
+1. Select the story to prepare
+2. Gather all relevant context: PRD requirements, architecture decisions, UX designs
+3. Write detailed acceptance criteria
+4. Identify technical approach and implementation notes
+5. List dependencies and integration points
+6. Create a comprehensive story card ready for development`,
+
+  CC: `COURSE CORRECTION WORKFLOW:
+Determine how to proceed when a major change is needed.
+
+1. Identify what changed and why
+2. Assess impact on current sprint and backlog
+3. Evaluate options: pivot, adjust, or stay the course
+4. Recommend a path forward with rationale
+5. Update affected artifacts and stories`,
+
+  DS: `DEV STORY WORKFLOW:
+Implement a user story with tests and code.
+
+1. Review the story and its acceptance criteria
+2. Plan the implementation approach
+3. Write tests first (TDD approach)
+4. Implement the code to pass the tests
+5. Review for code quality and best practices
+6. Provide the implementation summary and any notes for review`,
+
+  CR: `CODE REVIEW WORKFLOW:
+Conduct a comprehensive code review.
+
+1. Ask the user to share the code or describe what to review
+2. Evaluate: Code quality, patterns, security, performance, maintainability
+3. Check: Tests coverage, error handling, edge cases
+4. Provide: Line-by-line feedback with severity levels
+5. Summarize: Overall assessment and recommendations`,
+
+  QA: `QA AUTOMATION WORKFLOW:
+Generate tests for existing features.
+
+1. Ask what features or code to test
+2. Identify test types needed: unit, integration, E2E
+3. Generate test cases covering happy paths and edge cases
+4. Write test code using appropriate testing frameworks
+5. Provide coverage analysis and recommendations for additional tests`,
+};
+
+const COMMAND_AGENT_MAP: Record<string, string> = {
+  BP: "Mary",
+  MR: "Mary",
+  CB: "Mary",
+  CP: "John",
+  VP: "John",
+  CE: "John",
+  CA: "Winston",
+  IR: "Winston",
+  CU: "Sally",
+  SP: "Bob",
+  CS: "Bob",
+  CC: "Bob",
+  DS: "DevAI",
+  CR: "DevAI",
+  QA: "Quinn",
+};
+
+export function getAgentForCommand(trigger: string): string | undefined {
+  return COMMAND_AGENT_MAP[trigger.toUpperCase()];
+}
+
 export function buildSystemPrompt(agent: { name: string; title: string; role: string; identity: string; communicationStyle: string; principles: string; menuCommands?: { trigger: string; description: string }[] | null }, partyMode: boolean = false): string {
+  const commandWorkflows = agent.menuCommands?.map(cmd => {
+    const workflow = COMMAND_WORKFLOWS[cmd.trigger];
+    if (workflow) {
+      return `\n### Command: ${cmd.trigger} - ${cmd.description}\n${workflow}`;
+    }
+    return `\n### Command: ${cmd.trigger} - ${cmd.description}`;
+  }).join('\n') || '';
+
   const menuSection = agent.menuCommands && agent.menuCommands.length > 0 
-    ? `\n\nAvailable Commands:\n${agent.menuCommands.map(cmd => `- ${cmd.description}`).join('\n')}`
+    ? `\n\n## YOUR COMMANDS\nWhen a user types one of these command triggers, you MUST immediately begin executing the corresponding workflow. Do not ask "what would you like to do?" - jump straight into the workflow steps.\n${commandWorkflows}`
     : '';
 
   const partySection = partyMode 
@@ -145,8 +428,10 @@ Core Principles: ${agent.principles}${menuSection}${partySection}
 IMPORTANT GUIDELINES:
 - You are part of the BMad Method, an AI-driven agile development framework
 - Always stay in character as ${agent.name}
-- When users type /bmad-help, explain the BMad Method workflow and available commands
+- When a user sends a command trigger (like BP, MR, CP, CA, etc.), IMMEDIATELY begin the workflow for that command. Start with step 1 of the workflow - do not just describe what the command does.
+- When users type /bmad-help, explain the BMad Method workflow and your available commands
 - Be collaborative, constructive, and focused on delivering value
 - If a question is outside your expertise, suggest which other BMad agent would be better suited
-- Keep responses focused and actionable`;
+- Keep responses focused and actionable
+- Guide users through each workflow step by step, waiting for their input at each stage`;
 }

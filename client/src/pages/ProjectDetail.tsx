@@ -9,11 +9,21 @@ import {
 import { cn } from "@/lib/utils";
 import {
   fetchAgents, fetchMessages, createSession, deleteSession,
-  streamChat, fetchProjectSessions, updateProject,
+  streamChat, fetchProjectSessions, updateProject, updateSession,
   type StreamEvent
 } from "@/lib/api";
 import type { Agent, ChatMessage, Session, Project } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
+
+const COMMAND_AGENT_MAP: Record<string, string> = {
+  BP: "Mary", MR: "Mary", CB: "Mary",
+  CP: "John", VP: "John", CE: "John",
+  CA: "Winston", IR: "Winston",
+  CU: "Sally",
+  SP: "Bob", CS: "Bob", CC: "Bob",
+  DS: "DevAI", CR: "DevAI",
+  QA: "Quinn",
+};
 
 const BMAD_PHASES = [
   {
@@ -120,10 +130,40 @@ export default function ProjectDetail() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
   });
 
+  const [pendingCommand, setPendingCommand] = useState<{ trigger: string; sessionId: number } | null>(null);
+
   const handleNewSession = async () => {
     const session = await createSession(undefined, projectId);
     queryClient.invalidateQueries({ queryKey: ["project-sessions", projectId] });
     setActiveSessionId(session.id);
+    return session;
+  };
+
+  const handleCommand = async (trigger: string) => {
+    if (isStreaming) return;
+
+    const agentName = COMMAND_AGENT_MAP[trigger];
+    const targetAgent = agents.find(a => a.name === agentName);
+
+    let sessionId = activeSessionId;
+
+    if (!sessionId) {
+      const session = await createSession(trigger, projectId);
+      queryClient.invalidateQueries({ queryKey: ["project-sessions", projectId] });
+      setActiveSessionId(session.id);
+      sessionId = session.id;
+    }
+
+    if (targetAgent) {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activeAgentId: targetAgent.id }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["project-sessions", projectId] });
+    }
+
+    setPendingCommand({ trigger, sessionId });
   };
 
   const handleDeleteSession = async (id: number) => {
@@ -134,19 +174,25 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isStreaming || !activeSessionId) return;
+  useEffect(() => {
+    if (pendingCommand && pendingCommand.sessionId) {
+      const { trigger, sessionId } = pendingCommand;
+      setPendingCommand(null);
+      sendMessage(trigger, sessionId);
+    }
+  }, [pendingCommand]);
 
-    const userContent = input.trim();
-    setInput("");
+  const sendMessage = async (messageContent: string, overrideSessionId?: number) => {
+    const sid = overrideSessionId || activeSessionId;
+    if (!messageContent.trim() || isStreaming || !sid) return;
+
     setIsStreaming(true);
     setStreamingContent("");
     setPartyResponses([]);
 
     try {
       if (partyMode) {
-        await streamChat(activeSessionId, userContent, null, true, (event: StreamEvent) => {
+        await streamChat(sid, messageContent, null, true, (event: StreamEvent) => {
           switch (event.type) {
             case "agent_start":
               setPartyResponses(prev => [...prev, { agentName: event.agentName, content: "", done: false }]);
@@ -168,7 +214,7 @@ export default function ProjectDetail() {
           }
         });
       } else {
-        await streamChat(activeSessionId, userContent, activeAgent?.id || null, false, (event: StreamEvent) => {
+        await streamChat(sid, messageContent, activeAgent?.id || null, false, (event: StreamEvent) => {
           if (event.type === "content") setStreamingContent(prev => prev + event.content);
         });
       }
@@ -178,8 +224,25 @@ export default function ProjectDetail() {
       setIsStreaming(false);
       setStreamingContent("");
       setPartyResponses([]);
-      queryClient.invalidateQueries({ queryKey: ["messages", activeSessionId] });
+      queryClient.invalidateQueries({ queryKey: ["messages", sid] });
       queryClient.invalidateQueries({ queryKey: ["project-sessions", projectId] });
+    }
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isStreaming) return;
+
+    const userContent = input.trim();
+    setInput("");
+
+    if (!activeSessionId) {
+      const session = await createSession(undefined, projectId);
+      queryClient.invalidateQueries({ queryKey: ["project-sessions", projectId] });
+      setActiveSessionId(session.id);
+      await sendMessage(userContent, session.id);
+    } else {
+      await sendMessage(userContent);
     }
   };
 
@@ -298,6 +361,7 @@ export default function ProjectDetail() {
             onNewSession={handleNewSession}
             onDeleteSession={handleDeleteSession}
             onSend={handleSend}
+            onCommand={handleCommand}
             onAgentSwitch={handleAgentSwitch}
             currentPhase={currentPhase}
           />
@@ -313,7 +377,7 @@ function ChatView({
   sessions, messages, agents, activeSessionId, activeSession, activeAgent,
   isStreaming, streamingContent, partyMode, partyResponses, input, messagesEndRef,
   onSetInput, onSetActiveSessionId, onSetPartyMode, onNewSession, onDeleteSession,
-  onSend, onAgentSwitch, currentPhase,
+  onSend, onCommand, onAgentSwitch, currentPhase,
 }: {
   sessions: Session[];
   messages: ChatMessage[];
@@ -333,6 +397,7 @@ function ChatView({
   onNewSession: () => void;
   onDeleteSession: (id: number) => void;
   onSend: (e: React.FormEvent) => void;
+  onCommand: (trigger: string) => void;
   onAgentSwitch: (id: number) => void;
   currentPhase: typeof BMAD_PHASES[0];
 }) {
@@ -453,7 +518,7 @@ function ChatView({
                   <button
                     key={cmd.trigger}
                     data-testid={`button-command-${cmd.trigger}`}
-                    onClick={() => onSetInput(cmd.trigger)}
+                    onClick={() => onCommand(cmd.trigger)}
                     className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 border border-border/50 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <span className="font-mono text-primary mr-1">{cmd.trigger}</span>
