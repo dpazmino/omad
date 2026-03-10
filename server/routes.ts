@@ -583,6 +583,78 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
+  // ── Generate Claude Code prompt for a story ──
+  app.post("/api/stories/:id/generate-prompt", async (req, res) => {
+    const storyId = parseInt(req.params.id);
+    const story = await storage.getStory(storyId);
+    if (!story) return res.status(404).json({ error: "Story not found" });
+
+    const epic = await storage.getEpic(story.epicId);
+    const docs = await storage.getDocumentsByProject(story.projectId);
+
+    const archDoc = docs.find(d => d.docType === "architecture");
+    const prdDoc = docs.find(d => d.docType === "prd");
+    const uxDoc = docs.find(d => d.docType === "ux-design");
+
+    const contextParts: string[] = [];
+    contextParts.push(`# Story: ${story.title}`);
+    if (epic) contextParts.push(`## Epic: ${epic.title}\n${epic.description || ""}`);
+    contextParts.push(`## Description\n${story.description || "No description provided."}`);
+    if (story.acceptanceCriteria) contextParts.push(`## Acceptance Criteria\n${story.acceptanceCriteria}`);
+    if (story.priority) contextParts.push(`**Priority:** ${story.priority}`);
+    if (story.storyPoints) contextParts.push(`**Story Points:** ${story.storyPoints}`);
+
+    if (prdDoc) contextParts.push(`\n---\n## Project PRD (for context)\n${prdDoc.content.slice(0, 4000)}`);
+    if (archDoc) contextParts.push(`\n---\n## Architecture Document (for context)\n${archDoc.content.slice(0, 4000)}`);
+    if (uxDoc) contextParts.push(`\n---\n## UX Design (for context)\n${uxDoc.content.slice(0, 4000)}`);
+
+    const systemPrompt = `You are a senior software engineer writing implementation prompts for Claude Code (an AI coding agent). Given a user story with its context, write a clear, actionable prompt that Claude Code can follow to implement the story.
+
+Your prompt should:
+- Be specific about what files to create or modify
+- Include technical implementation details (APIs, data models, UI components)
+- Reference the architecture and design docs when relevant
+- Include acceptance criteria as testable requirements
+- Be structured with clear sections
+- Use markdown formatting
+
+Write ONLY the prompt — no preamble, no explanation, no meta-commentary.`;
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    try {
+      const stream = anthropic.messages.stream({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4096,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [{ role: "user", content: contextParts.join("\n\n") }],
+      });
+
+      let fullText = "";
+      stream.on("text", (text) => {
+        fullText += text;
+        res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+      });
+
+      stream.on("end", async () => {
+        await storage.updateStory(storyId, { prompt: fullText });
+        res.write(`data: ${JSON.stringify({ type: "done", prompt: fullText })}\n\n`);
+        res.end();
+      });
+
+      stream.on("error", (err) => {
+        res.write(`data: ${JSON.stringify({ type: "error", error: err.message })}\n\n`);
+        res.end();
+      });
+    } catch (err: any) {
+      res.write(`data: ${JSON.stringify({ type: "error", error: err.message })}\n\n`);
+      res.end();
+    }
+  });
+
   // ── Aggregate prompts from in-progress stories ──
   app.post("/api/projects/:id/aggregate-prompts", async (req, res) => {
     const projectId = parseInt(req.params.id);

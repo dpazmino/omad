@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout/Layout";
@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import {
   ArrowLeft, Copy, Check, AlertTriangle, ArrowUp, ArrowDown, Minus,
   ChevronDown, ChevronRight, Merge, ClipboardList, Sparkles, X,
-  CheckCircle2, FileText
+  CheckCircle2, FileText, Loader2, RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -50,7 +50,6 @@ export default function DevView() {
 
   const { toast } = useToast();
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
-  const [promptDraft, setPromptDraft] = useState("");
   const [aggregatedPrompt, setAggregatedPrompt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
@@ -81,20 +80,6 @@ export default function DevView() {
 
   const inProgressStories = stories.filter(s => s.status === "in-progress" && !s.mergedIntoStoryId);
   const storiesWithPrompts = inProgressStories.filter(s => s.prompt);
-
-  const [saving, setSaving] = useState(false);
-  const savePrompt = async (storyId: number, prompt: string) => {
-    setSaving(true);
-    try {
-      await apiPatch(`/api/stories/${storyId}`, { prompt });
-      invalidateAll();
-      toast({ title: "Prompt saved" });
-    } catch (e: any) {
-      toast({ title: "Failed to save prompt", description: e.message, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const aggregateMutation = useMutation({
     mutationFn: () => {
@@ -137,7 +122,6 @@ export default function DevView() {
 
   const selectStory = (story: Story) => {
     setSelectedStory(story);
-    setPromptDraft(story.prompt || "");
   };
 
   return (
@@ -273,17 +257,11 @@ export default function DevView() {
                 </div>
               </div>
             ) : selectedStory ? (
-              <StoryPromptEditor
+              <StoryPromptPanel
                 story={selectedStory}
                 epic={epics.find(e => e.id === selectedStory.epicId)}
-                promptDraft={promptDraft}
-                onPromptChange={setPromptDraft}
-                saving={saving}
-                onSave={async () => {
-                  await savePrompt(selectedStory.id, promptDraft);
-                  setSelectedStory({ ...selectedStory, prompt: promptDraft });
-                }}
-                onCopy={() => handleCopy(promptDraft)}
+                onPromptGenerated={() => invalidateAll()}
+                onCopy={handleCopy}
                 copied={copied}
               />
             ) : (
@@ -291,7 +269,7 @@ export default function DevView() {
                 <FileText size={48} className="text-muted-foreground/20 mb-4" />
                 <h3 className="text-lg font-semibold text-foreground">Select a Story</h3>
                 <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                  Click on an in-progress story from the left panel to write an implementation prompt for Claude Code.
+                  Click on an in-progress story from the left panel, then click "Generate Prompt" to have Claude create an implementation prompt for Claude Code.
                   Use the checkboxes to select stories, then click "Aggregate Prompts" to combine them.
                 </p>
               </div>
@@ -303,12 +281,77 @@ export default function DevView() {
   );
 }
 
-function StoryPromptEditor({ story, epic, promptDraft, onPromptChange, onSave, onCopy, copied, saving }: {
-  story: Story; epic?: Epic; promptDraft: string;
-  onPromptChange: (v: string) => void; onSave: () => void;
-  onCopy: () => void; copied: boolean; saving?: boolean;
+function StoryPromptPanel({ story, epic, onPromptGenerated, onCopy, copied }: {
+  story: Story; epic?: Epic;
+  onPromptGenerated: () => void;
+  onCopy: (text: string) => void; copied: boolean;
 }) {
-  const [showPreview, setShowPreview] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const [promptText, setPromptText] = useState(story.prompt || "");
+  const { toast } = useToast();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPromptText(story.prompt || "");
+    setStreamingText("");
+  }, [story.id, story.prompt]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [streamingText]);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setStreamingText("");
+    setPromptText("");
+
+    try {
+      const res = await fetch(`/api/stories/${story.id}/generate-prompt`, { method: "POST" });
+      if (!res.ok) throw new Error(await res.text());
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === "text") {
+              fullText += data.text;
+              setStreamingText(fullText);
+            } else if (data.type === "done") {
+              setPromptText(data.prompt);
+              setStreamingText("");
+              onPromptGenerated();
+              toast({ title: "Prompt generated and saved" });
+            } else if (data.type === "error") {
+              toast({ title: "Generation failed", description: data.error, variant: "destructive" });
+            }
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      toast({ title: "Failed to generate prompt", description: e.message, variant: "destructive" });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const displayText = generating ? streamingText : promptText;
+  const hasPrompt = !!displayText;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -319,31 +362,33 @@ function StoryPromptEditor({ story, epic, promptDraft, onPromptChange, onSave, o
             {epic && <p className="text-xs text-muted-foreground">{epic.title}</p>}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              data-testid="button-toggle-preview"
-              onClick={() => setShowPreview(!showPreview)}
-              className={cn("px-3 py-1 rounded-lg text-xs font-medium transition-colors",
-                showPreview ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-              )}
-            >
-              {showPreview ? "Edit" : "Preview"}
-            </button>
-            {promptDraft && (
+            {hasPrompt && !generating && (
               <button
                 data-testid="button-copy-prompt"
-                onClick={onCopy}
-                className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                onClick={() => onCopy(displayText)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
               >
                 {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
               </button>
             )}
             <button
-              data-testid="button-save-prompt"
-              onClick={onSave}
-              disabled={saving}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+              data-testid="button-generate-prompt"
+              onClick={handleGenerate}
+              disabled={generating}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                generating
+                  ? "bg-primary/10 text-primary"
+                  : "bg-primary text-white hover:bg-primary/90"
+              )}
             >
-              {saving ? "Saving..." : "Save Prompt"}
+              {generating ? (
+                <><Loader2 size={14} className="animate-spin" /> Generating...</>
+              ) : hasPrompt ? (
+                <><RefreshCw size={14} /> Regenerate</>
+              ) : (
+                <><Sparkles size={14} /> Generate Prompt</>
+              )}
             </button>
           </div>
         </div>
@@ -351,7 +396,7 @@ function StoryPromptEditor({ story, epic, promptDraft, onPromptChange, onSave, o
 
       <details className="border-b border-border bg-background px-4 py-2 shrink-0">
         <summary className="text-xs font-medium text-muted-foreground cursor-pointer flex items-center gap-1">
-          <ChevronRight size={12} className="details-chevron transition-transform" />
+          <ChevronRight size={12} />
           Story Details (Description &amp; Acceptance Criteria)
         </summary>
         <div className="mt-2 space-y-2 pb-2 max-h-[200px] overflow-auto">
@@ -370,27 +415,31 @@ function StoryPromptEditor({ story, epic, promptDraft, onPromptChange, onSave, o
       </details>
 
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-        <div className="px-4 py-2 border-b border-border bg-primary/5">
-          <label className="text-sm font-semibold text-primary flex items-center gap-2">
-            <Sparkles size={14} />
-            Write Your Claude Code Prompt Below
-          </label>
-        </div>
-        {showPreview ? (
-          <div className="flex-1 overflow-auto p-4">
+        {hasPrompt ? (
+          <div ref={scrollRef} className="flex-1 overflow-auto p-4">
             <div className="prose prose-sm max-w-none">
-              <ReactMarkdown>{promptDraft || "*No prompt written yet*"}</ReactMarkdown>
+              <ReactMarkdown>{displayText}</ReactMarkdown>
             </div>
+            {generating && (
+              <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse ml-0.5" />
+            )}
           </div>
         ) : (
-          <textarea
-            data-testid="textarea-story-prompt"
-            value={promptDraft}
-            onChange={e => onPromptChange(e.target.value)}
-            autoFocus
-            placeholder={"Start typing your implementation prompt here...\n\nExample:\n- Implement the API endpoint for...\n- Add a React component that...\n- Update the database schema to...\n- Write tests for..."}
-            className="flex-1 w-full px-4 py-3 bg-background text-sm text-foreground outline-none resize-none font-mono leading-relaxed border-l-4 border-primary/20"
-          />
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+            <Sparkles size={40} className="text-primary/20 mb-4" />
+            <h3 className="text-base font-semibold text-foreground">Generate Implementation Prompt</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md">
+              Click "Generate Prompt" to have Claude analyze this story and create an implementation prompt for Claude Code.
+            </p>
+            <button
+              data-testid="button-generate-prompt-cta"
+              onClick={handleGenerate}
+              disabled={generating}
+              className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+            >
+              <Sparkles size={16} /> Generate Prompt
+            </button>
+          </div>
         )}
       </div>
     </div>
