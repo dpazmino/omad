@@ -1,6 +1,4 @@
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { Send, CheckCircle2, Circle, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 interface ParsedQuestion {
@@ -340,34 +338,15 @@ interface InteractiveResponseProps {
 }
 
 export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, disabled }: InteractiveResponseProps) {
-  const parsed = isLastMessage ? parseAgentResponse(content) : null;
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [submitted, setSubmitted] = useState(false);
+  const parsed = isLastMessage && !disabled ? parseAgentResponse(content) : null;
 
-  if (!parsed || submitted || disabled) {
+  if (!parsed) {
     return (
       <div className="prose prose-sm max-w-none">
         <ReactMarkdown>{content}</ReactMarkdown>
       </div>
     );
   }
-
-  const allAnswered = parsed.questions.every(q => answers[q.id]?.trim());
-
-  const handleSubmit = () => {
-    const parts: string[] = [];
-    parsed.questions.forEach(q => {
-      const answer = answers[q.id];
-      if (q.type === "multiple-choice") {
-        const chosen = q.options?.find(o => o.label === answer);
-        parts.push(`${q.prompt}\nAnswer: ${chosen?.text || answer}`);
-      } else {
-        parts.push(`${q.prompt}\nAnswer: ${answer}`);
-      }
-    });
-    setSubmitted(true);
-    onSubmitAnswers(parts.join("\n\n"));
-  };
 
   return (
     <div className="space-y-4">
@@ -387,49 +366,18 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
 
             {q.type === "multiple-choice" && q.options && (
               <div className="grid gap-2 ml-5">
-                {q.options.map(opt => {
-                  const isSelected = answers[q.id] === opt.label;
-                  return (
-                    <button
-                      key={opt.label}
-                      data-testid={`option-${q.id}-${opt.label}`}
-                      onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt.label }))}
-                      className={cn(
-                        "flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm transition-all duration-200 group",
-                        isSelected
-                          ? "bg-primary/8 border border-primary/20 text-foreground shadow-sm"
-                          : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted hover:border-border hover:text-foreground"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors",
-                        isSelected ? "text-primary" : "text-muted-foreground/50"
-                      )}>
-                        {isSelected ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-                      </div>
-                      <span className={cn(
-                        "font-mono text-xs px-1.5 py-0.5 rounded shrink-0",
-                        isSelected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
-                      )}>
-                        {opt.label}
-                      </span>
-                      <span className="flex-1">{opt.text}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {q.type === "open-ended" && (
-              <div className="ml-5">
-                <textarea
-                  data-testid={`input-answer-${q.id}`}
-                  value={answers[q.id] || ""}
-                  onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                  placeholder="Type your answer..."
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 resize-none min-h-[80px] transition-all"
-                  rows={3}
-                />
+                {q.options.map(opt => (
+                  <div
+                    key={opt.label}
+                    data-testid={`option-${q.id}-${opt.label}`}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm bg-muted/50 border border-border text-muted-foreground"
+                  >
+                    <span className="font-mono text-xs px-1.5 py-0.5 rounded shrink-0 bg-muted text-muted-foreground">
+                      {opt.label}
+                    </span>
+                    <span className="flex-1">{opt.text}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -441,23 +389,6 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
           <ReactMarkdown>{parsed.closing}</ReactMarkdown>
         </div>
       )}
-
-      <div className="flex justify-end mt-2">
-        <button
-          data-testid="button-submit-answers"
-          onClick={handleSubmit}
-          disabled={!allAnswered}
-          className={cn(
-            "flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-            allAnswered
-              ? "bg-primary text-white shadow-sm hover:bg-primary/90 hover:shadow-md"
-              : "bg-muted text-muted-foreground cursor-not-allowed"
-          )}
-        >
-          <Send size={14} />
-          Submit Answers
-        </button>
-      </div>
     </div>
   );
 }
