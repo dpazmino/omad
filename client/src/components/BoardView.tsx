@@ -7,6 +7,7 @@ import {
   LayoutGrid, List, Import
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ReactMarkdown from "react-markdown";
 
 const STORY_STATUSES = ["backlog", "todo", "in-progress", "review", "done"] as const;
 const PRIORITIES = ["low", "medium", "high", "critical"] as const;
@@ -32,6 +33,13 @@ const PRIORITY_ICONS: Record<string, React.ReactNode> = {
   high: <ArrowUp size={12} className="text-orange-500" />,
   medium: <Minus size={12} className="text-yellow-500" />,
   low: <ArrowDown size={12} className="text-blue-400" />,
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  critical: "bg-red-50 text-red-700 border-red-200",
+  high: "bg-orange-50 text-orange-700 border-orange-200",
+  medium: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  low: "bg-blue-50 text-blue-400 border-blue-200",
 };
 
 interface BoardViewProps {
@@ -429,6 +437,7 @@ function KanbanBoard({ stories, epics, sprints, selectedSprint, onSelectSprint, 
 function StoryDetailModal({ story, epics, sprints, onClose, onSave }: {
   story: Story; epics: Epic[]; sprints: Sprint[]; onClose: () => void; onSave: () => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({
     title: story.title,
     description: story.description,
@@ -455,104 +464,152 @@ function StoryDetailModal({ story, epics, sprints, onClose, onSave }: {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-background rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h3 className="font-semibold text-foreground">Edit Story</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" data-testid="button-close-story-modal">
-            <X size={18} />
-          </button>
+          <h3 className="font-semibold text-foreground">{isEditing ? "Edit Story" : "Story Details"}</h3>
+          <div className="flex items-center gap-2">
+            <button
+              data-testid="button-toggle-edit-story"
+              onClick={() => setIsEditing(!isEditing)}
+              className={cn("px-3 py-1 rounded-lg text-xs font-medium transition-colors", isEditing ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary")}
+            >
+              {isEditing ? "View" : "Edit"}
+            </button>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground" data-testid="button-close-story-modal">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="p-4 space-y-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">Title</label>
-            <input
-              data-testid="input-story-title"
-              value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary/40"
-            />
+            {isEditing ? (
+              <input
+                data-testid="input-story-title"
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary/40"
+              />
+            ) : (
+              <p className="px-3 py-2 text-sm font-medium text-foreground">{form.title}</p>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Status</label>
-              <select
-                data-testid="select-story-status"
-                value={form.status}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none"
-              >
-                {STORY_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-              </select>
+          <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Status:</span>
+              {isEditing ? (
+                <select
+                  data-testid="select-story-status"
+                  value={form.status}
+                  onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                  className="px-2 py-1 rounded-lg border border-border bg-background text-xs text-foreground outline-none"
+                >
+                  {STORY_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                </select>
+              ) : (
+                <span className={cn("text-xs px-2 py-0.5 rounded-full border", STATUS_COLORS[form.status])}>
+                  {STATUS_LABELS[form.status] || form.status}
+                </span>
+              )}
             </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Priority</label>
-              <select
-                data-testid="select-story-priority"
-                value={form.priority}
-                onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none"
-              >
-                {PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-              </select>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Priority:</span>
+              {isEditing ? (
+                <select
+                  data-testid="select-story-priority"
+                  value={form.priority}
+                  onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}
+                  className="px-2 py-1 rounded-lg border border-border bg-background text-xs text-foreground outline-none"
+                >
+                  {PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+                </select>
+              ) : (
+                <span className={cn("text-xs px-2 py-0.5 rounded-full border", PRIORITY_COLORS[form.priority])}>
+                  {form.priority.charAt(0).toUpperCase() + form.priority.slice(1)}
+                </span>
+              )}
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Story Points</label>
-              <input
-                data-testid="input-story-points"
-                type="number"
-                value={form.storyPoints}
-                onChange={e => setForm(f => ({ ...f, storyPoints: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none"
-                placeholder="—"
-              />
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Points:</span>
+              {isEditing ? (
+                <input
+                  data-testid="input-story-points"
+                  type="number"
+                  value={form.storyPoints}
+                  onChange={e => setForm(f => ({ ...f, storyPoints: e.target.value }))}
+                  className="w-16 px-2 py-1 rounded-lg border border-border bg-background text-xs text-foreground outline-none"
+                  placeholder="—"
+                />
+              ) : (
+                <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{form.storyPoints || "—"}</span>
+              )}
             </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Sprint</label>
-              <select
-                data-testid="select-story-sprint"
-                value={form.sprintId}
-                onChange={e => setForm(f => ({ ...f, sprintId: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none"
-              >
-                <option value="">No Sprint</option>
-                {sprints.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Sprint:</span>
+              {isEditing ? (
+                <select
+                  data-testid="select-story-sprint"
+                  value={form.sprintId}
+                  onChange={e => setForm(f => ({ ...f, sprintId: e.target.value }))}
+                  className="px-2 py-1 rounded-lg border border-border bg-background text-xs text-foreground outline-none"
+                >
+                  <option value="">No Sprint</option>
+                  {sprints.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              ) : (
+                <span className="text-xs bg-muted/50 px-2 py-0.5 rounded">
+                  {sprints.find(s => s.id === Number(form.sprintId))?.name || "None"}
+                </span>
+              )}
             </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Assignee</label>
-              <input
-                data-testid="input-story-assignee"
-                value={form.assignee}
-                onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none"
-                placeholder="Unassigned"
-              />
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Assignee:</span>
+              {isEditing ? (
+                <input
+                  data-testid="input-story-assignee"
+                  value={form.assignee}
+                  onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))}
+                  className="w-28 px-2 py-1 rounded-lg border border-border bg-background text-xs text-foreground outline-none"
+                  placeholder="Unassigned"
+                />
+              ) : (
+                <span className="text-xs text-foreground">{form.assignee || "Unassigned"}</span>
+              )}
             </div>
           </div>
 
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">Description</label>
-            <textarea
-              data-testid="input-story-description"
-              value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none resize-none min-h-[80px]"
-              rows={3}
-            />
+            {isEditing ? (
+              <textarea
+                data-testid="input-story-description"
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none resize-none min-h-[80px]"
+                rows={3}
+              />
+            ) : (
+              <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm prose prose-sm max-w-none">
+                <ReactMarkdown>{form.description || "No description"}</ReactMarkdown>
+              </div>
+            )}
           </div>
 
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">Acceptance Criteria</label>
-            <textarea
-              data-testid="input-story-ac"
-              value={form.acceptanceCriteria}
-              onChange={e => setForm(f => ({ ...f, acceptanceCriteria: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none resize-none min-h-[80px]"
-              rows={3}
-            />
+            {isEditing ? (
+              <textarea
+                data-testid="input-story-ac"
+                value={form.acceptanceCriteria}
+                onChange={e => setForm(f => ({ ...f, acceptanceCriteria: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none resize-none min-h-[80px]"
+                rows={3}
+              />
+            ) : (
+              <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm prose prose-sm max-w-none">
+                <ReactMarkdown>{form.acceptanceCriteria || "No acceptance criteria"}</ReactMarkdown>
+              </div>
+            )}
           </div>
         </div>
 
@@ -562,15 +619,17 @@ function StoryDetailModal({ story, epics, sprints, onClose, onSave }: {
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors"
           >
-            Cancel
+            {isEditing ? "Cancel" : "Close"}
           </button>
-          <button
-            data-testid="button-save-story"
-            onClick={handleSave}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
-          >
-            Save Changes
-          </button>
+          {isEditing && (
+            <button
+              data-testid="button-save-story"
+              onClick={handleSave}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+            >
+              Save Changes
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -623,7 +623,8 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
     const line = lines[i];
     const trimmed = line.trim();
 
-    const epicMatch = trimmed.match(/^#{1,2}\s+(?:[^a-zA-Z]*\s*)?epic\s*\d*[:\s]*(.+)/i);
+    const epicMatch = trimmed.match(/^#{1,2}\s+(?:[^a-zA-Z]*\s*)?(?:epic\s*\d*[:\s]*|E\d+\s*[—–\-:]\s*)(.+)/i);
+    if (epicMatch && /overview|summary/i.test(epicMatch[1])) continue;
     if (epicMatch) {
       if (currentStory && currentEpic) {
         if (collectingAC) currentStory.acceptanceCriteria = acLines.join("\n");
@@ -637,7 +638,7 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
       continue;
     }
 
-    const storyMatch = trimmed.match(/^#{2,4}\s+(?:[^a-zA-Z]*\s*)?(?:user\s+)?story\s*\d*[:\s]*(.+)/i);
+    const storyMatch = trimmed.match(/^#{2,4}\s+(?:[^a-zA-Z]*\s*)?(?:user\s+)?story\s*(?:E?\d+[\-.]?\d*)?[:\s]*(.+)/i);
     if (storyMatch && currentEpic) {
       if (currentStory) {
         if (collectingAC) currentStory.acceptanceCriteria = acLines.join("\n");
@@ -671,13 +672,17 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
       if (trimmed.startsWith("#") || (trimmed === "" && acLines.length > 0 && lines[i + 1]?.trim().startsWith("#"))) {
         currentStory.acceptanceCriteria = acLines.join("\n");
         collectingAC = false;
+      } else if (trimmed.startsWith("|") || trimmed.match(/^\|?[\s-]+\|/)) {
+        continue;
       } else {
         acLines.push(trimmed);
       }
     } else if (currentStory && !collectingAC && trimmed && !trimmed.startsWith("#")) {
+      if (trimmed.startsWith("|") || trimmed.match(/^\|?[\s-]+\|/)) continue;
       if (currentStory.description) currentStory.description += "\n" + trimmed;
       else currentStory.description = trimmed;
     } else if (currentEpic && !currentStory && trimmed && !trimmed.startsWith("#")) {
+      if (trimmed.startsWith("|") || trimmed.match(/^\|?[\s-]+\|/)) continue;
       if (currentEpic.description) currentEpic.description += "\n" + trimmed;
       else currentEpic.description = trimmed;
     }
