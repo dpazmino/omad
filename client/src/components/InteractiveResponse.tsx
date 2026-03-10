@@ -101,6 +101,39 @@ function removePromptAbove(bucket: string[]): void {
   }
 }
 
+const TABLE_ROW = /^\|(.+)\|$/;
+const TABLE_SEPARATOR = /^\|[\s:]*-+[\s:]*\|/;
+
+function isTableStart(lines: string[], idx: number): boolean {
+  if (idx + 2 >= lines.length) return false;
+  const header = lines[idx].trim();
+  const sep = lines[idx + 1].trim();
+  const firstRow = lines[idx + 2].trim();
+  return TABLE_ROW.test(header) && TABLE_SEPARATOR.test(sep) && TABLE_ROW.test(firstRow);
+}
+
+function collectTableOptions(lines: string[], startIdx: number): { options: { label: string; text: string }[]; endIdx: number } {
+  const options: { label: string; text: string }[] = [];
+  let idx = startIdx + 2;
+  while (idx < lines.length) {
+    const trimmed = lines[idx].trim();
+    if (!TABLE_ROW.test(trimmed) || TABLE_SEPARATOR.test(trimmed)) {
+      idx++;
+      if (!TABLE_ROW.test(trimmed)) break;
+      continue;
+    }
+    const cells = trimmed.split("|").filter(c => c.trim() !== "");
+    if (cells.length >= 1) {
+      const label = String.fromCharCode(65 + options.length);
+      const name = cells[0].replace(/\*{1,2}/g, "").replace(/[🧠🎩🔄🕸️💡🎯🔍⚡🚀✨🎨📊🔬🏗️📋💻🧪🎮]/gu, "").trim();
+      const desc = cells.length >= 2 ? cells[1].replace(/\*{1,2}/g, "").trim() : "";
+      options.push({ label, text: desc ? `${name} — ${desc}` : name });
+    }
+    idx++;
+  }
+  return { options, endIdx: idx };
+}
+
 function hasChoiceListAhead(lines: string[], idx: number): "letter" | "numbered" | "dash" | null {
   for (let j = idx; j < lines.length && j < idx + 3; j++) {
     const t = lines[j].trim();
@@ -136,6 +169,23 @@ function parseAgentResponse(content: string): ParsedContent | null {
 
   while (i < lines.length) {
     const trimmed = lines[i].trim();
+
+    if (isTableStart(lines, i)) {
+      const prompt = findPromptAbove(currentBucket());
+      removePromptAbove(currentBucket());
+      const { options, endIdx } = collectTableOptions(lines, i);
+      if (options.length >= 2) {
+        foundInteractive = true;
+        questions.push({
+          id: questions.length + 1,
+          prompt: prompt || "Select an option:",
+          type: "multiple-choice",
+          options,
+        });
+      }
+      i = endIdx;
+      continue;
+    }
 
     if (trimmed.match(LETTER_OPTION)) {
       const prompt = findPromptAbove(currentBucket());
