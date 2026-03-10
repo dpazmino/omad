@@ -86,7 +86,7 @@ const COMMAND_PREREQUISITES: Record<string, { requires: string[]; label: string 
   VP: { requires: ["prd"], label: "PRD" },
   CU: { requires: ["prd"], label: "PRD" },
   CA: { requires: ["prd"], label: "PRD" },
-  CE: { requires: ["architecture"], label: "Architecture Doc" },
+  CE: { requires: ["architecture", "prd", "ux-design"], label: "Architecture + PRD + UX Design" },
   IR: { requires: ["architecture", "prd"], label: "Architecture + PRD" },
 };
 
