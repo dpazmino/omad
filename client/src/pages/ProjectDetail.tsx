@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import type { Agent, ChatMessage, Session, Project } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
+import { InteractiveResponse } from "@/components/InteractiveResponse";
 
 const COMMAND_AGENT_MAP: Record<string, string> = {
   BP: "Mary", MR: "Mary", CB: "Mary",
@@ -361,6 +362,7 @@ export default function ProjectDetail() {
             onNewSession={handleNewSession}
             onDeleteSession={handleDeleteSession}
             onSend={handleSend}
+            onSendMessage={sendMessage}
             onCommand={handleCommand}
             onAgentSwitch={handleAgentSwitch}
             currentPhase={currentPhase}
@@ -377,7 +379,7 @@ function ChatView({
   sessions, messages, agents, activeSessionId, activeSession, activeAgent,
   isStreaming, streamingContent, partyMode, partyResponses, input, messagesEndRef,
   onSetInput, onSetActiveSessionId, onSetPartyMode, onNewSession, onDeleteSession,
-  onSend, onCommand, onAgentSwitch, currentPhase,
+  onSend, onSendMessage, onCommand, onAgentSwitch, currentPhase,
 }: {
   sessions: Session[];
   messages: ChatMessage[];
@@ -390,13 +392,14 @@ function ChatView({
   partyMode: boolean;
   partyResponses: { agentName: string; content: string; done: boolean }[];
   input: string;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
   onSetInput: (v: string) => void;
   onSetActiveSessionId: (id: number) => void;
   onSetPartyMode: (v: boolean) => void;
   onNewSession: () => void;
   onDeleteSession: (id: number) => void;
   onSend: (e: React.FormEvent) => void;
+  onSendMessage: (content: string) => void;
   onCommand: (trigger: string) => void;
   onAgentSwitch: (id: number) => void;
   currentPhase: typeof BMAD_PHASES[0];
@@ -529,8 +532,15 @@ function ChatView({
             </div>
           )}
 
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} agents={agents} />
+          {messages.map((msg, idx) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              agents={agents}
+              isLastAssistantMessage={msg.role === "assistant" && idx === messages.length - 1}
+              isStreaming={isStreaming}
+              onSubmitAnswers={(response) => onSendMessage(response)}
+            />
           ))}
 
           {isStreaming && !partyMode && streamingContent && (
@@ -736,7 +746,13 @@ function WorkflowsView({ phase }: { phase: string }) {
   );
 }
 
-function MessageBubble({ message, agents }: { message: ChatMessage; agents: Agent[] }) {
+function MessageBubble({ message, agents, isLastAssistantMessage, isStreaming, onSubmitAnswers }: {
+  message: ChatMessage;
+  agents: Agent[];
+  isLastAssistantMessage: boolean;
+  isStreaming: boolean;
+  onSubmitAnswers: (response: string) => void;
+}) {
   const isUser = message.role === "user";
   const agent = message.agentId ? agents.find(a => a.id === message.agentId) : null;
 
@@ -764,17 +780,20 @@ function MessageBubble({ message, agents }: { message: ChatMessage; agents: Agen
             <span className="text-xs text-muted-foreground font-medium ml-1">{message.agentName}</span>
           )}
           <div className={cn(
-            "px-5 py-3.5 rounded-2xl max-w-[85%] text-sm leading-relaxed",
+            "px-5 py-3.5 rounded-2xl text-sm leading-relaxed",
             isUser
-              ? "bg-primary text-primary-foreground rounded-tr-sm"
-              : "glass-card text-foreground rounded-tl-sm border border-white/5"
+              ? "bg-primary text-primary-foreground rounded-tr-sm max-w-[85%]"
+              : "glass-card text-foreground rounded-tl-sm border border-white/5 max-w-full min-w-[300px]"
           )}>
             {isUser ? (
               message.content
             ) : (
-              <div className="prose prose-invert prose-sm max-w-none">
-                <ReactMarkdown>{message.content}</ReactMarkdown>
-              </div>
+              <InteractiveResponse
+                content={message.content}
+                onSubmitAnswers={onSubmitAnswers}
+                isLastMessage={isLastAssistantMessage}
+                disabled={isStreaming}
+              />
             )}
           </div>
         </div>

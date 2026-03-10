@@ -14,6 +14,7 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
 - **Projects**: Central organizing concept — each project has its own sessions, workflows, and phase tracking
 - **7 BMad Agents**: Winston (Architect), John (PM), Mary (Analyst), Sally (UX), Bob (Scrum Master), DevAI (Developer), Quinn (QA)
 - **Real-time Chat**: Streaming SSE responses from OpenAI with agent personas (project-scoped)
+- **Interactive Responses**: Agent responses with questions/choices are parsed into interactive UI (radio buttons for MC, text inputs for open-ended). Located in `client/src/components/InteractiveResponse.tsx`
 - **Party Mode**: Multiple agents collaborate and respond sequentially
 - **Workflow Guide**: Visual reference for the 4-phase BMad development lifecycle per project
 - **Phase Tracking**: Projects track their current BMad phase (analysis → planning → solutioning → implementation)
@@ -26,6 +27,7 @@ client/src/
   pages/Workflows.tsx     - BMad workflow reference (global)
   pages/Projects.tsx      - Project listing dashboard
   pages/ProjectDetail.tsx - Project detail with chat + workflows tabs
+  components/InteractiveResponse.tsx - Parses agent Q&A into interactive UI
   components/layout/      - Sidebar, Layout
   lib/api.ts              - API client functions
 
