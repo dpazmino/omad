@@ -1,0 +1,65 @@
+
+📊 Mary
+Party: Off
+Docs
+OpenAI
+MR --- **Context from previous phase documents:** ## Brainstorm Summary ## Brainstorm Summary (SCAMPER → MVP direction) **Project:** App that ingests **Prisma Cloud** scan reports (jar vulnerabilities) and upgrades Java repos by proposing dependency version changes. **Users:** Developers (primary), with AppSec as reviewer. **Workflow placement:** Post-repo creation; integrates with **GitHub + GitLab**; **not** CI/IDE. **Automation:** **Human-in-the-loop**; tool **also opens PR/MR** for review. **Repo types:** **Both Maven + Gradle**, including **multi-module/multi-project day 1**. **Key output constraint:** **Do not output whole files/classes**—return **line numbers + changed lines** (minimal diff). **Top MVP priorities chosen:** **(4) Review packet + (13) minimal line-level output + (15) traceability/evidence**. **Inputs available:** Prisma Cloud export formats: **SARIF / JSON / CSV**. ## Top Concept (3–5 most promising concepts → we selected 1 clear winner) ### Concept: “Prisma-to-Dependency Fix Pack + PR/MR” - **Core concept:** Map Prisma vulnerable JAR findings to Maven/Gradle dependency declarations (across modules), propose safe version bumps, and generate a **review packet** + **precise line edits**, then open a **PR/MR** containing only those edits. - **Target user:** Devs maintaining Java services/libs in GitHub/GitLab. - **Key differentiator:** Extreme precision + auditability: `{file, line, before, after}` with Prisma finding ID/CVE/fixed-in evidence. - **Primary challenges to solve next:** jar→GAV mapping, transitive vs direct deps, locating the “right” version source (parent POM, dependencyManagement, Gradle catalogs/BOMs). ## Next Steps (recommended) If you want, we can now run **CB (Create Brief)** to turn this into a structured product brief (vision, personas, problem statement, solution, success metrics, risks). Before we switch, answer 2 quick “requirements-grade” questions (so the PR/MR + line numbers are implementable): 1) For PR/MR output, is it acceptable to include a **standard git diff patch**, as long as the *report* also lists **file + line + before/after**? 2) For multi-module version updates, should the tool **prefer changing the central version source** (parent/dependencyManagement/version catalog) rather than each module’s dependency line? Say `CB` when you’re ready and I’ll start the product brief workflow.
+📊
+Mary (Business Analyst)
+Treasure map acquired. Let’s switch hats into MR (Market Research) mode for this: “Prisma-to-Dependency Fix Pack + PR/MR”—a human-in-the-loop tool that ingests Prisma Cloud vulnerability exports and produces precise, auditable Maven/Gradle version bumps (multi-module day 1), plus a review packet and PR/MR.
+
+1) Topic discovery (so I scope the research correctly)
+Before I dive into landscape/competitors/customers, I need 6 crisp inputs:
+
+Target buyer / deployment: Is this sold to enterprise AppSec (platform/tooling) or dev teams directly? SaaS, self-hosted, or both?
+Primary geos / compliance: Any must-haves like SOC2, on-prem-only, FedRAMP, EU-only?
+Prisma relationship: Is the product Prisma-first only, or “Prisma first, others later” (Snyk/Dependabot/Trivy/etc.)?
+Repo hosting scope: Confirm GitHub + GitLab only for MVP, or do we include Bitbucket/Azure DevOps in scope for market sizing?
+Target segment: Who first—mid-market SaaS, large enterprise, regulated (fintech/health), or OSS maintainers?
+Pricing motion guess: Per-repo, per-seat, per-scan volume, or enterprise license?
+Reply with short bullets and I’ll proceed immediately into:
+
+market landscape (DevSecOps + SCA remediation automation),
+competitive intel (Dependabot, Renovate, Snyk, Mend, JFrog, Chainguard, Endor Labs, etc.),
+customer pain points + buying triggers,
+opportunities/gaps specifically around your differentiator: line-level minimal diffs + traceability + Prisma export ingestion.
+1) Target buyer / deployment: Is this sold to enterprise AppSec (platform/tooling) or dev teams directly? SaaS, self-hosted, or both? Answer: Repo hosting scope: Confirm GitHub + GitLab only for MVP, or do we include Bitbucket/Azure DevOps in scope for market sizing? Reply with short bullets and I’ll proceed immediately into: Answer: opportunities/gaps specifically around your differentiator: line-level minimal diffs + traceability + Prisma export ingestion.
+📊
+Mary (Business Analyst)
+I’ve got a few “clues,” but your reply looks like some answers got pasted over by the questions. Let’s pin the six scope inputs cleanly (short bullets is perfect). Fill what you can; “TBD” is fine.
+
+Buyer: AppSec/platform team, dev team leads, or both?
+Deployment: SaaS, self-hosted, or hybrid? Any “must be on-prem” accounts?
+Compliance/geo: SOC2, ISO, FedRAMP, EU data residency, etc.?
+Scanner scope: Prisma-only MVP, or Prisma-first then others?
+Repo hosts: MVP = GitHub + GitLab confirmed; for market sizing, include Bitbucket/Azure DevOps or ignore?
+First target segment: mid-market SaaS, large enterprise, regulated, OSS, etc.?
+(Optional but helpful) Ideal pricing motion: per repo / per developer / per scan / enterprise?
+Once you answer, I’ll run the full MR workflow: market landscape → competitive analysis (direct/adjacent) → customer analysis → opportunities/threats → a structured research report tailored to the minimal-diff + evidence packet + PR/MR differentiator.
+
+1) Buyer: AppSec/platform team, dev team leads, or both? Answer: Compliance/geo: SOC2, ISO, FedRAMP, EU data residency, etc.?
+1) Buyer: AppSec/platform team, dev team leads, or both? Answer: Compliance/geo: SOC2, ISO, FedRAMP, EU data residency, etc.?
+1) Buyer: AppSec/platform team, dev team leads, or both? Answer: Compliance/geo: SOC2, ISO, FedRAMP, EU data residency, etc.?
+📊
+Mary (Business Analyst)
+You’re still echoing the questions back at me (no actual selections yet). Let’s make this foolproof: reply with just the letter for each line.
+
+1) Buyer (pick one)
+A) AppSec / platform security team (primary economic buyer)
+B) Dev team leads / engineering managers (primary)
+C) Both (AppSec buys; devs are daily users)
+D) Both (dev org buys; AppSec is approver)
+
+2) Compliance / geo (pick all that apply)
+A) None / startup-friendly
+B) SOC2 expected
+C) ISO 27001 expected
+D) EU data residency required
+E) FedRAMP / gov-grade required
+F) Other: ____
+
+Then I’ll immediately continue with MR Step 2 (market landscape) using your choices to anchor which competitors and segments matter most.
+
+1) Buyer (pick one) Answer: Dev team leads / engineering managers (primary) 2) Compliance / geo (pick all that apply) Answer: SOC2 expected
+1) Buyer (pick one) Answer: Dev team leads / engineering managers (primary) 2) Compliance / geo (pick all that apply) Answer: SOC2 expected
+Error: AI service error: openai is not defined
