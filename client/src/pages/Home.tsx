@@ -126,35 +126,33 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="flex-1 flex flex-col h-screen relative">
-        {/* Header */}
-        <header className="h-16 border-b border-border/50 glass-panel flex items-center px-6 justify-between shrink-0 sticky top-0 z-10" data-testid="chat-header">
+      <div className="flex-1 flex flex-col h-screen relative bg-background">
+        <header className="h-16 border-b border-border bg-white flex items-center px-6 justify-between shrink-0 sticky top-0 z-10" data-testid="chat-header">
           <div className="flex items-center gap-4">
-            <h2 className="font-heading font-medium">{activeSession?.title || "New Session"}</h2>
+            <h2 className="font-heading font-medium text-foreground">{activeSession?.title || "New Session"}</h2>
             <div className="flex gap-2 flex-wrap">
-              {/* Agent selector dropdown */}
               <div className="relative group">
                 <button
                   data-testid="button-agent-selector"
-                  className="px-2 py-1 rounded-md bg-primary/20 text-primary text-xs font-medium flex items-center gap-1 hover:bg-primary/30 transition-colors"
+                  className="px-2 py-1 rounded-md bg-primary/8 text-primary text-xs font-medium flex items-center gap-1 hover:bg-primary/15 transition-colors border border-primary/10"
                 >
                   <Bot size={12} />
                   {activeAgent ? `${activeAgent.icon} ${activeAgent.name}` : "Select Agent"}
                 </button>
-                <div className="absolute top-full left-0 mt-1 w-56 glass-panel rounded-lg border border-border/50 shadow-xl hidden group-hover:block z-50 py-1">
+                <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg border border-border shadow-lg hidden group-hover:block z-50 py-1">
                   {agents.filter(a => a.status === "active").map(agent => (
                     <button
                       key={agent.id}
                       data-testid={`button-agent-${agent.id}`}
                       onClick={() => handleAgentSwitch(agent.id)}
                       className={cn(
-                        "w-full text-left px-3 py-2 text-xs hover:bg-white/5 flex items-center gap-2 transition-colors",
-                        agent.id === activeAgent?.id && "bg-primary/10 text-primary"
+                        "w-full text-left px-3 py-2 text-xs hover:bg-muted flex items-center gap-2 transition-colors",
+                        agent.id === activeAgent?.id && "bg-primary/8 text-primary"
                       )}
                     >
                       <span>{agent.icon}</span>
                       <div>
-                        <div className="font-medium">{agent.name}</div>
+                        <div className="font-medium text-foreground">{agent.name}</div>
                         <div className="text-muted-foreground text-[10px]">{agent.title}</div>
                       </div>
                     </button>
@@ -168,8 +166,8 @@ export default function Home() {
                 className={cn(
                   "px-2 py-1 rounded-md text-xs font-medium border transition-colors flex items-center gap-1",
                   partyMode
-                    ? "bg-accent/20 text-accent border-accent/30"
-                    : "bg-white/5 text-muted-foreground border-border hover:text-foreground"
+                    ? "bg-accent/10 text-accent border-accent/20"
+                    : "bg-muted text-muted-foreground border-border hover:text-foreground"
                 )}
               >
                 <Sparkles size={12} />
@@ -181,26 +179,25 @@ export default function Home() {
             <button
               data-testid="button-new-session"
               onClick={handleNewSession}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors bg-white/5 px-3 py-1.5 rounded-md border border-border/50"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors bg-muted px-3 py-1.5 rounded-md border border-border"
             >
               <Plus size={12} />
               New
             </button>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-black/20 px-3 py-1.5 rounded-full border border-border/50">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted px-3 py-1.5 rounded-full border border-border">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               OpenAI Connected
             </div>
           </div>
         </header>
 
-        {/* Chat Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth" data-testid="chat-messages">
           {messages.length === 0 && !isStreaming && (
             <div className="flex flex-col items-center justify-center h-full text-center animate-in fade-in duration-500">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4 shadow-lg shadow-primary/20">
+              <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-sm">
                 <Bot size={32} className="text-white" />
               </div>
-              <h2 className="text-2xl font-heading font-bold mb-2">BMad Method</h2>
+              <h2 className="text-2xl font-heading font-bold mb-2 text-foreground">BMad Method</h2>
               <p className="text-muted-foreground max-w-md mb-6">
                 {activeAgent
                   ? `${activeAgent.icon} ${activeAgent.name} (${activeAgent.title}) is ready. ${activeAgent.communicationStyle}`
@@ -212,7 +209,7 @@ export default function Home() {
                     key={cmd.trigger}
                     data-testid={`button-command-${cmd.trigger}`}
                     onClick={() => setInput(cmd.trigger)}
-                    className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 border border-border/50 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+                    className="px-3 py-1.5 text-xs bg-muted hover:bg-border border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {cmd.description}
                   </button>
@@ -225,19 +222,18 @@ export default function Home() {
             <MessageBubble key={msg.id} message={msg} agents={agents} />
           ))}
 
-          {/* Streaming content (single agent) */}
           {isStreaming && !partyMode && streamingContent && (
             <div className="flex max-w-4xl mr-auto animate-in fade-in">
               <div className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-primary/20">
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 mt-1 shadow-sm">
                   <Bot size={16} className="text-white" />
                 </div>
                 <div className="flex flex-col gap-1 items-start">
                   <span className="text-xs text-muted-foreground font-medium ml-1">
                     {activeAgent ? `${activeAgent.icon} ${activeAgent.name} (${activeAgent.title})` : "Agent"}
                   </span>
-                  <div className="glass-card px-5 py-3.5 rounded-2xl rounded-tl-sm border border-white/5 max-w-[85%]">
-                    <div className="prose prose-invert prose-sm max-w-none">
+                  <div className="bg-white px-5 py-3.5 rounded-2xl rounded-tl-sm border border-border shadow-sm max-w-[85%]">
+                    <div className="prose prose-sm max-w-none">
                       <ReactMarkdown>{streamingContent}</ReactMarkdown>
                     </div>
                   </div>
@@ -246,17 +242,16 @@ export default function Home() {
             </div>
           )}
 
-          {/* Party mode responses */}
           {isStreaming && partyMode && partyResponses.map((pr, idx) => (
             <div key={idx} className="flex max-w-4xl mr-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-primary/20">
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 mt-1 shadow-sm">
                   <Bot size={16} className="text-white" />
                 </div>
                 <div className="flex flex-col gap-1 items-start">
                   <span className="text-xs text-muted-foreground font-medium ml-1">{pr.agentName}</span>
-                  <div className="glass-card px-5 py-3.5 rounded-2xl rounded-tl-sm border border-white/5 max-w-[85%]">
-                    <div className="prose prose-invert prose-sm max-w-none">
+                  <div className="bg-white px-5 py-3.5 rounded-2xl rounded-tl-sm border border-border shadow-sm max-w-[85%]">
+                    <div className="prose prose-sm max-w-none">
                       <ReactMarkdown>{pr.content}</ReactMarkdown>
                     </div>
                     {!pr.done && (
@@ -271,17 +266,16 @@ export default function Home() {
             </div>
           ))}
 
-          {/* Typing indicator */}
           {isStreaming && !streamingContent && partyResponses.length === 0 && (
             <div className="flex max-w-4xl mr-auto animate-in fade-in">
               <div className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/50 to-accent/50 flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-primary/10">
+                <div className="w-8 h-8 rounded-lg bg-primary/60 flex items-center justify-center shrink-0 mt-1">
                   <Bot size={16} className="text-white" />
                 </div>
-                <div className="glass-card px-5 py-4 rounded-2xl rounded-tl-sm border border-white/5 flex items-center gap-1.5 mt-1">
-                  <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
-                  <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
-                  <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" />
+                <div className="bg-white px-5 py-4 rounded-2xl rounded-tl-sm border border-border shadow-sm flex items-center gap-1.5 mt-1">
+                  <div className="w-2 h-2 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.3s]" />
+                  <div className="w-2 h-2 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.15s]" />
+                  <div className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" />
                 </div>
               </div>
             </div>
@@ -289,11 +283,9 @@ export default function Home() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
-        <div className="p-4 md:p-6 shrink-0 glass-panel border-t border-border/50 z-10">
+        <div className="p-4 md:p-6 shrink-0 bg-white border-t border-border z-10">
           <form onSubmit={handleSend} className="max-w-4xl mx-auto relative group" data-testid="chat-form">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative flex items-end gap-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-2 shadow-2xl transition-all duration-300 focus-within:border-primary/50 focus-within:bg-black/60">
+            <div className="relative flex items-end gap-2 bg-background border border-border rounded-xl p-2 shadow-sm transition-all duration-300 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
               <div className="flex-1 pl-2">
                 <textarea
                   ref={textareaRef}
@@ -307,7 +299,7 @@ export default function Home() {
                     }
                   }}
                   placeholder={activeAgent ? `Ask ${activeAgent.name} (${activeAgent.title})...` : "Start typing..."}
-                  className="w-full max-h-32 min-h-[44px] bg-transparent border-none outline-none resize-none py-3 text-sm placeholder:text-muted-foreground focus:ring-0"
+                  className="w-full max-h-32 min-h-[44px] bg-transparent border-none outline-none resize-none py-3 text-sm placeholder:text-muted-foreground focus:ring-0 text-foreground"
                   rows={1}
                   disabled={isStreaming}
                 />
@@ -316,7 +308,7 @@ export default function Home() {
                 type="submit"
                 data-testid="button-send"
                 disabled={!input.trim() || isStreaming}
-                className="w-10 h-10 shrink-0 rounded-lg bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center mb-1 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-primary/25 transition-all duration-200"
+                className="w-10 h-10 shrink-0 rounded-lg bg-primary text-white flex items-center justify-center mb-1 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all duration-200"
               >
                 {isStreaming ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -336,7 +328,7 @@ export default function Home() {
                   <Command size={12} /> /bmad-help
                 </button>
               </div>
-              <div>Press <kbd className="font-mono bg-white/5 px-1 py-0.5 rounded text-[10px]">Enter</kbd> to send</div>
+              <div>Press <kbd className="font-mono bg-muted px-1 py-0.5 rounded text-[10px] border border-border">Enter</kbd> to send</div>
             </div>
           </form>
         </div>
@@ -361,10 +353,10 @@ function MessageBubble({ message, agents }: { message: ChatMessage; agents: Agen
         <div className={cn(
           "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-1",
           isUser
-            ? "bg-secondary"
-            : "bg-gradient-to-br from-primary/80 to-accent/80 text-white shadow-lg shadow-primary/20"
+            ? "bg-muted border border-border"
+            : "bg-primary text-white shadow-sm"
         )}>
-          {isUser ? <User size={16} /> : (
+          {isUser ? <User size={16} className="text-muted-foreground" /> : (
             agent ? <span className="text-sm">{agent.icon}</span> : <Bot size={16} />
           )}
         </div>
@@ -376,12 +368,12 @@ function MessageBubble({ message, agents }: { message: ChatMessage; agents: Agen
             "px-5 py-3.5 rounded-2xl max-w-[85%] text-sm leading-relaxed",
             isUser
               ? "bg-primary text-primary-foreground rounded-tr-sm"
-              : "glass-card text-foreground rounded-tl-sm border border-white/5"
+              : "bg-white text-foreground rounded-tl-sm border border-border shadow-sm"
           )}>
             {isUser ? (
               message.content
             ) : (
-              <div className="prose prose-invert prose-sm max-w-none">
+              <div className="prose prose-sm max-w-none">
                 <ReactMarkdown>{message.content}</ReactMarkdown>
               </div>
             )}

@@ -59,29 +59,27 @@ export default function Projects() {
 
   return (
     <Layout>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-background">
         <div className="p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-heading font-bold mb-2" data-testid="text-projects-title">Projects</h1>
+              <h1 className="text-3xl font-heading font-bold mb-2 text-foreground" data-testid="text-projects-title">Projects</h1>
               <p className="text-muted-foreground">Manage your BMad development projects.</p>
             </div>
             <button
               data-testid="button-create-project"
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-primary/20"
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
               <Plus size={16} />
               Create Project
             </button>
           </div>
 
-          {/* Create Project Modal */}
           {showCreate && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-              <div className="glass-card w-full max-w-md p-6 rounded-2xl border border-white/10 shadow-2xl animate-in zoom-in-95 duration-200">
-                <h2 className="text-xl font-heading font-bold mb-4">New Project</h2>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white w-full max-w-md p-6 rounded-2xl border border-border shadow-xl animate-in zoom-in-95 duration-200">
+                <h2 className="text-xl font-heading font-bold mb-4 text-foreground">New Project</h2>
                 <form onSubmit={handleCreate} className="space-y-4">
                   <div>
                     <label className="text-sm font-medium text-foreground block mb-1.5">Project Name</label>
@@ -91,7 +89,7 @@ export default function Projects() {
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
                       placeholder="My Awesome App"
-                      className="w-full px-4 py-2.5 rounded-lg bg-black/40 border border-white/10 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 transition-colors text-sm"
+                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all text-sm"
                       autoFocus
                     />
                   </div>
@@ -102,7 +100,7 @@ export default function Projects() {
                       value={newDescription}
                       onChange={(e) => setNewDescription(e.target.value)}
                       placeholder="Brief description of what you're building..."
-                      className="w-full px-4 py-2.5 rounded-lg bg-black/40 border border-white/10 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 transition-colors text-sm min-h-[80px] resize-none"
+                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all text-sm min-h-[80px] resize-none"
                       rows={3}
                     />
                   </div>
@@ -111,7 +109,7 @@ export default function Projects() {
                       type="button"
                       data-testid="button-cancel-create"
                       onClick={() => { setShowCreate(false); setNewName(""); setNewDescription(""); }}
-                      className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                      className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     >
                       Cancel
                     </button>
@@ -129,19 +127,18 @@ export default function Projects() {
             </div>
           )}
 
-          {/* Active Projects */}
           {isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
-                <div key={i} className="glass-card h-32 rounded-2xl animate-pulse" />
+                <div key={i} className="bg-white h-32 rounded-xl border border-border animate-pulse" />
               ))}
             </div>
           ) : projects.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-primary/8 border border-primary/10 flex items-center justify-center mb-4">
                 <FolderKanban size={32} className="text-primary" />
               </div>
-              <h2 className="text-xl font-heading font-semibold mb-2">No projects yet</h2>
+              <h2 className="text-xl font-heading font-semibold mb-2 text-foreground">No projects yet</h2>
               <p className="text-muted-foreground max-w-sm mb-6">
                 Create your first project to start using the BMad Method with your AI development team.
               </p>
@@ -191,18 +188,18 @@ function ProjectCard({ project, onDelete }: { project: Project; onDelete: () => 
     <div
       data-testid={`card-project-${project.id}`}
       onClick={() => navigate(`/projects/${project.id}`)}
-      className="glass-card p-5 rounded-2xl border border-white/5 relative overflow-hidden group transition-all duration-300 hover:border-primary/20 cursor-pointer"
+      className="bg-white p-5 rounded-xl border border-border relative overflow-hidden group transition-all duration-200 hover:border-primary/20 hover:shadow-md cursor-pointer"
     >
       <div className={cn("absolute left-0 top-0 bottom-0 w-1", phase.color)} />
 
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+            <div className="p-2 rounded-lg bg-primary/8 border border-primary/10">
               <FolderKanban size={18} className="text-primary" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-lg font-heading font-semibold truncate" data-testid={`text-project-name-${project.id}`}>
+              <h3 className="text-lg font-heading font-semibold truncate text-foreground" data-testid={`text-project-name-${project.id}`}>
                 {project.name}
               </h3>
               {project.description && (
@@ -213,7 +210,7 @@ function ProjectCard({ project, onDelete }: { project: Project; onDelete: () => 
 
           <div className="flex items-center gap-3 ml-12 mt-3 flex-wrap">
             <span className={cn("px-2.5 py-1 rounded-md text-xs font-medium border", 
-              `${phase.color}/20 text-foreground border-white/10`
+              `${phase.color}/10 text-foreground border-border`
             )}>
               Phase: {phase.label}
             </span>
@@ -232,18 +229,18 @@ function ProjectCard({ project, onDelete }: { project: Project; onDelete: () => 
           <button
             data-testid={`button-project-menu-${project.id}`}
             onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-            className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+            className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <MoreVertical size={16} />
           </button>
           {showMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 w-40 glass-panel rounded-lg border border-border/50 shadow-xl z-50 py-1">
+              <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg border border-border shadow-lg z-50 py-1">
                 <button
                   data-testid={`button-delete-project-${project.id}`}
                   onClick={() => { onDelete(); setShowMenu(false); }}
-                  className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-white/5 flex items-center gap-2 transition-colors"
+                  className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-muted flex items-center gap-2 transition-colors"
                 >
                   <Trash2 size={14} />
                   Delete Project

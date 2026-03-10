@@ -8,7 +8,7 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
 - **AI**: OpenAI via Replit AI Integrations (gpt-5.2 model)
-- **Styling**: Dark theme with glassmorphism ("Dark Future" aesthetic)
+- **Styling**: Professional light banking theme — navy primary (hsl 215 75% 30%), teal accent (hsl 168 55% 35%), off-white backgrounds, white cards with subtle shadows
 
 ## Key Features
 - **Projects**: Central organizing concept — each project has its own sessions, workflows, and phase tracking

@@ -62,20 +62,19 @@ const BMAD_PHASES = [
 export default function Workflows() {
   return (
     <Layout>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-background">
         <div className="p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
           <div>
-            <h1 className="text-3xl font-heading font-bold mb-2" data-testid="text-workflows-title">BMad Workflows</h1>
+            <h1 className="text-3xl font-heading font-bold mb-2 text-foreground" data-testid="text-workflows-title">BMad Workflows</h1>
             <p className="text-muted-foreground">
               The BMad Method guides you through a structured agile process from idea to deployment. Each phase has specialized agents and commands.
             </p>
           </div>
 
-          {/* Phase flow visualization */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {BMAD_PHASES.map((phase, idx) => (
               <div key={phase.id} className="flex items-center gap-2">
-                <div className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium whitespace-nowrap border border-primary/20">
+                <div className="px-3 py-1.5 rounded-full bg-primary/8 text-primary text-xs font-medium whitespace-nowrap border border-primary/10">
                   {phase.title}
                 </div>
                 {idx < BMAD_PHASES.length - 1 && (
@@ -87,15 +86,15 @@ export default function Workflows() {
 
           <div className="space-y-6">
             {BMAD_PHASES.map((phase) => (
-              <div key={phase.id} className="glass-card p-6 rounded-2xl border border-white/5 relative overflow-hidden group" data-testid={`card-phase-${phase.id}`}>
+              <div key={phase.id} className="bg-white p-6 rounded-xl border border-border shadow-sm relative overflow-hidden group hover:shadow-md hover:border-primary/20 transition-all" data-testid={`card-phase-${phase.id}`}>
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
 
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+                    <div className="p-2 rounded-lg bg-primary/8 border border-primary/10">
                       <GitBranch size={18} className="text-primary" />
                     </div>
-                    <h3 className="text-xl font-heading font-semibold">{phase.title}</h3>
+                    <h3 className="text-xl font-heading font-semibold text-foreground">{phase.title}</h3>
                   </div>
 
                   <p className="text-sm text-muted-foreground ml-12">
@@ -106,7 +105,7 @@ export default function Workflows() {
                     <div className="text-xs font-medium text-foreground">Agents:</div>
                     <div className="flex flex-wrap gap-2">
                       {phase.agents.map(agent => (
-                        <span key={agent} className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs border border-primary/20">
+                        <span key={agent} className="px-2 py-1 rounded-md bg-primary/8 text-primary text-xs border border-primary/10">
                           {agent}
                         </span>
                       ))}
@@ -117,7 +116,7 @@ export default function Workflows() {
                     <div className="text-xs font-medium text-foreground">Commands:</div>
                     <div className="flex flex-wrap gap-2">
                       {phase.commands.map(cmd => (
-                        <span key={cmd.trigger} className="px-2.5 py-1.5 rounded-md bg-white/5 text-xs text-muted-foreground border border-white/5 hover:border-primary/30 hover:text-foreground transition-colors cursor-default" data-testid={`text-command-${cmd.trigger}`}>
+                        <span key={cmd.trigger} className="px-2.5 py-1.5 rounded-md bg-muted text-xs text-muted-foreground border border-border hover:border-primary/20 hover:text-foreground transition-colors cursor-default" data-testid={`text-command-${cmd.trigger}`}>
                           <span className="font-mono text-primary mr-1">{cmd.trigger}</span>
                           {cmd.name}
                         </span>
@@ -129,8 +128,8 @@ export default function Workflows() {
             ))}
           </div>
 
-          <div className="glass-card p-6 rounded-2xl border border-white/5">
-            <h3 className="font-heading font-semibold mb-3">Getting Started</h3>
+          <div className="bg-white p-6 rounded-xl border border-border shadow-sm">
+            <h3 className="font-heading font-semibold mb-3 text-foreground">Getting Started</h3>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>1. Go to the <span className="text-primary">Chat</span> page and start a new session</p>
               <p>2. Select an agent using the agent dropdown (or use Party Mode for multi-agent collaboration)</p>

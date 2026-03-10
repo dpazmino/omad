@@ -243,7 +243,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
 
   if (!parsed || submitted || disabled) {
     return (
-      <div className="prose prose-invert prose-sm max-w-none">
+      <div className="prose prose-sm max-w-none">
         <ReactMarkdown>{content}</ReactMarkdown>
       </div>
     );
@@ -269,7 +269,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
   return (
     <div className="space-y-4">
       {parsed.preamble && (
-        <div className="prose prose-invert prose-sm max-w-none">
+        <div className="prose prose-sm max-w-none">
           <ReactMarkdown>{parsed.preamble}</ReactMarkdown>
         </div>
       )}
@@ -294,8 +294,8 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
                       className={cn(
                         "flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm transition-all duration-200 group",
                         isSelected
-                          ? "bg-primary/15 border border-primary/40 text-foreground shadow-sm shadow-primary/10"
-                          : "bg-white/[0.03] border border-white/[0.06] text-muted-foreground hover:bg-white/[0.06] hover:border-white/10 hover:text-foreground"
+                          ? "bg-primary/8 border border-primary/20 text-foreground shadow-sm"
+                          : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted hover:border-border hover:text-foreground"
                       )}
                     >
                       <div className={cn(
@@ -306,7 +306,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
                       </div>
                       <span className={cn(
                         "font-mono text-xs px-1.5 py-0.5 rounded shrink-0",
-                        isSelected ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground"
+                        isSelected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
                       )}>
                         {opt.label}
                       </span>
@@ -324,7 +324,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
                   value={answers[q.id] || ""}
                   onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
                   placeholder="Type your answer..."
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 focus:bg-white/[0.05] resize-none min-h-[80px] transition-all"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 resize-none min-h-[80px] transition-all"
                   rows={3}
                 />
               </div>
@@ -334,7 +334,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
       </div>
 
       {parsed.closing && (
-        <div className="prose prose-invert prose-sm max-w-none mt-3">
+        <div className="prose prose-sm max-w-none mt-3">
           <ReactMarkdown>{parsed.closing}</ReactMarkdown>
         </div>
       )}
@@ -347,8 +347,8 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
           className={cn(
             "flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
             allAnswered
-              ? "bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-[1.02]"
-              : "bg-white/5 text-muted-foreground cursor-not-allowed"
+              ? "bg-primary text-white shadow-sm hover:bg-primary/90 hover:shadow-md"
+              : "bg-muted text-muted-foreground cursor-not-allowed"
           )}
         >
           <Send size={14} />

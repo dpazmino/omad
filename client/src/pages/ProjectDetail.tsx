@@ -78,6 +78,17 @@ const BMAD_PHASES = [
 
 type Tab = "chat" | "workflows";
 
+const COMMAND_PREREQUISITES: Record<string, { requires: string[]; label: string }> = {
+  MR: { requires: ["brainstorm"], label: "Brainstorm Summary" },
+  CB: { requires: ["brainstorm"], label: "Brainstorm Summary" },
+  CP: { requires: ["product-brief"], label: "Product Brief" },
+  VP: { requires: ["prd"], label: "PRD" },
+  CU: { requires: ["prd"], label: "PRD" },
+  CA: { requires: ["prd"], label: "PRD" },
+  CE: { requires: ["architecture"], label: "Architecture Doc" },
+  IR: { requires: ["architecture", "prd"], label: "Architecture + PRD" },
+};
+
 export default function ProjectDetail() {
   const params = useParams<{ id: string }>();
   const projectId = parseInt(params.id!);
@@ -140,7 +151,7 @@ export default function ProjectDetail() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
   });
 
-  const [pendingCommand, setPendingCommand] = useState<{ trigger: string; sessionId: number } | null>(null);
+  const [pendingCommand, setPendingCommand] = useState<{ trigger: string; sessionId: number; messageContent?: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleNewSession = async () => {
@@ -150,8 +161,30 @@ export default function ProjectDetail() {
     return session;
   };
 
+  const getPrerequisiteDocs = (trigger: string): { met: boolean; missing: string[]; docs: Document[] } => {
+    const prereqs = COMMAND_PREREQUISITES[trigger];
+    if (!prereqs) return { met: true, missing: [], docs: [] };
+    const missing: string[] = [];
+    const docs: Document[] = [];
+    for (const reqType of prereqs.requires) {
+      const doc = projectDocuments.find(d => d.docType === reqType);
+      if (doc) {
+        docs.push(doc);
+      } else {
+        missing.push(reqType.replace("-", " "));
+      }
+    }
+    return { met: missing.length === 0, missing, docs };
+  };
+
   const handleCommand = async (trigger: string) => {
     if (isStreaming) return;
+
+    const { met, missing, docs } = getPrerequisiteDocs(trigger);
+    if (!met) {
+      setErrorMessage(`Cannot run ${trigger}: missing required document(s): ${missing.join(", ")}. Complete the prerequisite step first.`);
+      return;
+    }
 
     const agentName = COMMAND_AGENT_MAP[trigger];
     const targetAgent = agents.find(a => a.name === agentName);
@@ -174,7 +207,13 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ["project-sessions", projectId] });
     }
 
-    setPendingCommand({ trigger, sessionId });
+    let messageContent = trigger;
+    if (docs.length > 0) {
+      const contextParts = docs.map(d => `## ${d.title}\n${d.content}`);
+      messageContent = `${trigger}\n\n---\n**Context from previous phase documents:**\n\n${contextParts.join("\n\n---\n\n")}`;
+    }
+
+    setPendingCommand({ trigger, sessionId, messageContent });
   };
 
   const handleDeleteSession = async (id: number) => {
@@ -187,9 +226,9 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     if (pendingCommand && pendingCommand.sessionId) {
-      const { trigger, sessionId } = pendingCommand;
+      const { trigger, sessionId, messageContent } = pendingCommand;
       setPendingCommand(null);
-      sendMessage(trigger, sessionId, true);
+      sendMessage(messageContent || trigger, sessionId, true);
     }
   }, [pendingCommand]);
 
@@ -295,7 +334,7 @@ export default function ProjectDetail() {
     <Layout>
       <div className="flex-1 flex flex-col h-screen">
         {/* Project Header */}
-        <header className="border-b border-border/50 glass-panel shrink-0 px-6 py-3">
+        <header className="border-b border-border bg-white shrink-0 px-6 py-3">
           <div className="flex items-center gap-4 mb-2">
             <Link href="/projects" data-testid="link-back-projects" className="text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft size={18} />
@@ -320,8 +359,8 @@ export default function ProjectDetail() {
                     className={cn(
                       "px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-all",
                       project.phase === phase.id
-                        ? "bg-primary/20 text-primary border-primary/30"
-                        : "bg-white/5 text-muted-foreground border-white/10 hover:border-primary/20 hover:text-foreground"
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "bg-muted text-muted-foreground border-border hover:border-primary/20 hover:text-foreground"
                     )}
                   >
                     {phase.title}
@@ -341,7 +380,7 @@ export default function ProjectDetail() {
                   "px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors",
                   activeTab === "chat"
                     ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
                 <MessageSquare size={14} />
@@ -354,7 +393,7 @@ export default function ProjectDetail() {
                   "px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors",
                   activeTab === "workflows"
                     ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
                 <GitBranch size={14} />
@@ -393,6 +432,7 @@ export default function ProjectDetail() {
               onDismissError={() => setErrorMessage(null)}
               showDocPanel={showDocPanel}
               onToggleDocPanel={() => setShowDocPanel(!showDocPanel)}
+              projectDocuments={projectDocuments}
             />
             {showDocPanel && (
               <DocumentsPanel
@@ -425,7 +465,7 @@ function ChatView({
   isStreaming, streamingContent, partyMode, partyResponses, input, messagesEndRef,
   onSetInput, onSetActiveSessionId, onSetPartyMode, onNewSession, onDeleteSession,
   onSend, onSendMessage, onCommand, onAgentSwitch, currentPhase,
-  errorMessage, onDismissError, showDocPanel, onToggleDocPanel,
+  errorMessage, onDismissError, showDocPanel, onToggleDocPanel, projectDocuments,
 }: {
   sessions: Session[];
   messages: ChatMessage[];
@@ -453,17 +493,18 @@ function ChatView({
   onDismissError: () => void;
   showDocPanel: boolean;
   onToggleDocPanel: () => void;
+  projectDocuments: Document[];
 }) {
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Session sidebar */}
-      <div className="w-56 border-r border-border/50 glass-panel flex flex-col shrink-0 hidden md:flex">
-        <div className="p-3 border-b border-border/50 flex items-center justify-between">
+      <div className="w-56 border-r border-border bg-white flex flex-col shrink-0 hidden md:flex">
+        <div className="p-3 border-b border-border flex items-center justify-between">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sessions</span>
           <button
             data-testid="button-new-project-session"
             onClick={onNewSession}
-            className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             <Plus size={14} />
           </button>
@@ -482,7 +523,7 @@ function ChatView({
                 "group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer text-xs transition-colors",
                 s.id === activeSessionId
                   ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
               onClick={() => onSetActiveSessionId(s.id)}
             >
@@ -490,7 +531,7 @@ function ChatView({
               <span className="truncate flex-1">{s.title}</span>
               <button
                 onClick={(e) => { e.stopPropagation(); onDeleteSession(s.id); }}
-                className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-destructive transition-all"
+                className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-all"
               >
                 <Trash2 size={10} />
               </button>
@@ -502,24 +543,24 @@ function ChatView({
       {/* Chat area */}
       <div className="flex-1 flex flex-col">
         {/* Chat toolbar */}
-        <div className="h-12 border-b border-border/30 flex items-center px-4 gap-3 shrink-0">
+        <div className="h-12 border-b border-border flex items-center px-4 gap-3 shrink-0 bg-background">
           <div className="relative group">
             <button
               data-testid="button-agent-selector"
-              className="px-2 py-1 rounded-md bg-primary/20 text-primary text-xs font-medium flex items-center gap-1 hover:bg-primary/30 transition-colors"
+              className="px-2 py-1 rounded-md bg-primary/8 text-primary text-xs font-medium flex items-center gap-1 hover:bg-primary/15 transition-colors border border-primary/10"
             >
               <Bot size={12} />
               {activeAgent ? `${activeAgent.icon} ${activeAgent.name}` : "Select Agent"}
               <ChevronDown size={10} />
             </button>
-            <div className="absolute top-full left-0 mt-1 w-56 glass-panel rounded-lg border border-border/50 shadow-xl hidden group-hover:block z-50 py-1">
+            <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg border border-border shadow-lg hidden group-hover:block z-50 py-1">
               {agents.filter(a => a.status === "active").map(agent => (
                 <button
                   key={agent.id}
                   data-testid={`button-agent-${agent.id}`}
                   onClick={() => onAgentSwitch(agent.id)}
                   className={cn(
-                    "w-full text-left px-3 py-2 text-xs hover:bg-white/5 flex items-center gap-2 transition-colors",
+                    "w-full text-left px-3 py-2 text-xs hover:bg-muted flex items-center gap-2 transition-colors",
                     agent.id === activeAgent?.id && "bg-primary/10 text-primary"
                   )}
                 >
@@ -539,8 +580,8 @@ function ChatView({
             className={cn(
               "px-2 py-1 rounded-md text-xs font-medium border transition-colors flex items-center gap-1",
               partyMode
-                ? "bg-accent/20 text-accent border-accent/30"
-                : "bg-white/5 text-muted-foreground border-border hover:text-foreground"
+                ? "bg-accent/10 text-accent border-accent/20"
+                : "bg-muted text-muted-foreground border-border hover:text-foreground"
             )}
           >
             <Sparkles size={12} />
@@ -553,8 +594,8 @@ function ChatView({
             className={cn(
               "px-2 py-1 rounded-md text-xs font-medium border transition-colors flex items-center gap-1",
               showDocPanel
-                ? "bg-primary/20 text-primary border-primary/30"
-                : "bg-white/5 text-muted-foreground border-border hover:text-foreground"
+                ? "bg-primary/10 text-primary border-primary/20"
+                : "bg-muted text-muted-foreground border-border hover:text-foreground"
             )}
           >
             {showDocPanel ? <PanelRightClose size={12} /> : <PanelRightOpen size={12} />}
@@ -571,7 +612,7 @@ function ChatView({
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth" data-testid="chat-messages">
           {messages.length === 0 && !isStreaming && (
             <div className="flex flex-col items-center justify-center h-full text-center animate-in fade-in duration-500">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4 shadow-lg shadow-primary/20">
+              <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-sm">
                 <Bot size={32} className="text-white" />
               </div>
               <h2 className="text-xl font-heading font-bold mb-2">
@@ -581,17 +622,31 @@ function ChatView({
                 {currentPhase.description}
               </p>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                {currentPhase.commands.map(cmd => (
-                  <button
-                    key={cmd.trigger}
-                    data-testid={`button-command-${cmd.trigger}`}
-                    onClick={() => onCommand(cmd.trigger)}
-                    className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 border border-border/50 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <span className="font-mono text-primary mr-1">{cmd.trigger}</span>
-                    {cmd.name}
-                  </button>
-                ))}
+                {currentPhase.commands.map(cmd => {
+                  const prereqs = COMMAND_PREREQUISITES[cmd.trigger];
+                  const prereqsMet = !prereqs || prereqs.requires.every(
+                    reqType => projectDocuments.some(d => d.docType === reqType)
+                  );
+                  return (
+                    <button
+                      key={cmd.trigger}
+                      data-testid={`button-command-${cmd.trigger}`}
+                      onClick={() => prereqsMet ? onCommand(cmd.trigger) : undefined}
+                      disabled={!prereqsMet}
+                      title={!prereqsMet ? `Requires: ${prereqs!.label}` : undefined}
+                      className={cn(
+                        "px-3 py-1.5 text-xs border rounded-lg transition-colors",
+                        prereqsMet
+                          ? "bg-muted hover:bg-border border-border text-muted-foreground hover:text-foreground cursor-pointer"
+                          : "bg-muted/50 border-border/50 text-muted-foreground/40 cursor-not-allowed"
+                      )}
+                    >
+                      <span className={cn("font-mono mr-1", prereqsMet ? "text-primary" : "text-primary/30")}>{cmd.trigger}</span>
+                      {cmd.name}
+                      {!prereqsMet && <span className="ml-1 text-[10px]">(needs {prereqs!.label})</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -610,15 +665,15 @@ function ChatView({
           {isStreaming && !partyMode && streamingContent && (
             <div className="flex max-w-4xl mr-auto animate-in fade-in">
               <div className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-primary/20">
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 mt-1 shadow-sm">
                   <Bot size={16} className="text-white" />
                 </div>
                 <div className="flex flex-col gap-1 items-start">
                   <span className="text-xs text-muted-foreground font-medium ml-1">
                     {activeAgent ? `${activeAgent.icon} ${activeAgent.name} (${activeAgent.title})` : "Agent"}
                   </span>
-                  <div className="glass-card px-5 py-3.5 rounded-2xl rounded-tl-sm border border-white/5 max-w-[85%]">
-                    <div className="prose prose-invert prose-sm max-w-none">
+                  <div className="bg-white px-5 py-3.5 rounded-2xl rounded-tl-sm border border-border shadow-sm max-w-[85%]">
+                    <div className="prose prose-sm max-w-none">
                       <ReactMarkdown>{streamingContent}</ReactMarkdown>
                     </div>
                   </div>
@@ -630,13 +685,13 @@ function ChatView({
           {isStreaming && partyMode && partyResponses.map((pr, idx) => (
             <div key={idx} className="flex max-w-4xl mr-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-primary/20">
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 mt-1 shadow-sm">
                   <Bot size={16} className="text-white" />
                 </div>
                 <div className="flex flex-col gap-1 items-start">
                   <span className="text-xs text-muted-foreground font-medium ml-1">{pr.agentName}</span>
-                  <div className="glass-card px-5 py-3.5 rounded-2xl rounded-tl-sm border border-white/5 max-w-[85%]">
-                    <div className="prose prose-invert prose-sm max-w-none">
+                  <div className="bg-white px-5 py-3.5 rounded-2xl rounded-tl-sm border border-border shadow-sm max-w-[85%]">
+                    <div className="prose prose-sm max-w-none">
                       <ReactMarkdown>{pr.content}</ReactMarkdown>
                     </div>
                     {!pr.done && (
@@ -654,10 +709,10 @@ function ChatView({
           {isStreaming && !streamingContent && partyResponses.length === 0 && (
             <div className="flex max-w-4xl mr-auto animate-in fade-in">
               <div className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/50 to-accent/50 flex items-center justify-center shrink-0 mt-1">
+                <div className="w-8 h-8 rounded-lg bg-primary/60 flex items-center justify-center shrink-0 mt-1">
                   <Bot size={16} className="text-white" />
                 </div>
-                <div className="glass-card px-5 py-4 rounded-2xl rounded-tl-sm border border-white/5 flex items-center gap-1.5 mt-1">
+                <div className="bg-white px-5 py-4 rounded-2xl rounded-tl-sm border border-border shadow-sm flex items-center gap-1.5 mt-1">
                   <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
                   <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
                   <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" />
@@ -669,15 +724,15 @@ function ChatView({
         </div>
 
         {errorMessage && (
-          <div className="px-4 py-3 shrink-0 border-t border-red-500/20 bg-red-500/10 backdrop-blur-md" data-testid="error-banner">
+          <div className="px-4 py-3 shrink-0 border-t border-red-200 bg-red-50" data-testid="error-banner">
             <div className="max-w-4xl mx-auto flex items-center gap-3">
-              <div className="flex-1 text-sm text-red-400">
+              <div className="flex-1 text-sm text-red-600">
                 <span className="font-medium">Error:</span> {errorMessage}
               </div>
               <button
                 data-testid="button-dismiss-error"
                 onClick={onDismissError}
-                className="text-red-400/60 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
+                className="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-100 transition-colors"
               >
                 Dismiss
               </button>
@@ -688,7 +743,7 @@ function ChatView({
                   const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
                   if (lastUserMsg) onSendMessage(lastUserMsg.content);
                 }}
-                className="text-xs px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 hover:text-red-200 transition-colors font-medium"
+                className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-medium"
               >
                 Retry
               </button>
@@ -697,10 +752,9 @@ function ChatView({
         )}
 
         {/* Input */}
-        <div className="p-4 shrink-0 glass-panel border-t border-border/50 z-10">
+        <div className="p-4 shrink-0 bg-white border-t border-border z-10">
           <form onSubmit={onSend} className="max-w-4xl mx-auto relative group" data-testid="chat-form">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative flex items-end gap-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-2 shadow-2xl transition-all duration-300 focus-within:border-primary/50 focus-within:bg-black/60">
+            <div className="relative flex items-end gap-2 bg-background border border-border rounded-xl p-2 shadow-sm transition-all duration-300 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
               <div className="flex-1 pl-2">
                 <textarea
                   data-testid="input-chat"
@@ -710,7 +764,7 @@ function ChatView({
                     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(e); }
                   }}
                   placeholder={activeAgent ? `Ask ${activeAgent.name} (${activeAgent.title})...` : "Start typing..."}
-                  className="w-full max-h-32 min-h-[44px] bg-transparent border-none outline-none resize-none py-3 text-sm placeholder:text-muted-foreground focus:ring-0"
+                  className="w-full max-h-32 min-h-[44px] bg-transparent border-none outline-none resize-none py-3 text-sm placeholder:text-muted-foreground focus:ring-0 text-foreground"
                   rows={1}
                   disabled={isStreaming || !activeSessionId}
                 />
@@ -719,7 +773,7 @@ function ChatView({
                 type="submit"
                 data-testid="button-send"
                 disabled={!input.trim() || isStreaming || !activeSessionId}
-                className="w-10 h-10 shrink-0 rounded-lg bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center mb-1 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-primary/25 transition-all duration-200"
+                className="w-10 h-10 shrink-0 rounded-lg bg-primary text-white flex items-center justify-center mb-1 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all duration-200"
               >
                 {isStreaming ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -737,7 +791,7 @@ function ChatView({
               >
                 <Command size={12} /> /bmad-help
               </button>
-              <div>Press <kbd className="font-mono bg-white/5 px-1 py-0.5 rounded text-[10px]">Enter</kbd> to send</div>
+              <div>Press <kbd className="font-mono bg-muted px-1 py-0.5 rounded text-[10px] border border-border">Enter</kbd> to send</div>
             </div>
           </form>
         </div>
@@ -768,14 +822,14 @@ function WorkflowsView({ phase }: { phase: string }) {
               key={phase.id}
               data-testid={`card-workflow-phase-${phase.id}`}
               className={cn(
-                "glass-card p-5 rounded-2xl border relative overflow-hidden transition-all",
-                isCurrent ? "border-primary/30" : "border-white/5",
+                "bg-white p-5 rounded-xl border shadow-sm relative overflow-hidden transition-all",
+                isCurrent ? "border-primary/20" : "border-border",
                 isPast && "opacity-70"
               )}
             >
               <div className={cn(
                 "absolute left-0 top-0 bottom-0 w-1",
-                isCurrent ? "bg-primary" : isPast ? "bg-green-500" : "bg-white/10"
+                isCurrent ? "bg-primary" : isPast ? "bg-green-500" : "bg-border"
               )} />
 
               <div className="space-y-3">
@@ -786,7 +840,7 @@ function WorkflowsView({ phase }: { phase: string }) {
                       ? "bg-primary/10 border-primary/30"
                       : isPast
                         ? "bg-green-500/10 border-green-500/30"
-                        : "bg-white/5 border-white/10"
+                        : "bg-muted border-border"
                   )}>
                     <GitBranch size={16} className={cn(
                       isCurrent ? "text-primary" : isPast ? "text-green-500" : "text-muted-foreground"
@@ -799,7 +853,7 @@ function WorkflowsView({ phase }: { phase: string }) {
                     </span>
                   )}
                   {isPast && (
-                    <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-medium border border-green-500/30">
+                    <span className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 text-xs font-medium border border-green-500/20">
                       Done
                     </span>
                   )}
@@ -822,7 +876,7 @@ function WorkflowsView({ phase }: { phase: string }) {
                   <div className="text-xs font-medium text-foreground">Commands:</div>
                   <div className="flex flex-wrap gap-2">
                     {phase.commands.map(cmd => (
-                      <span key={cmd.trigger} className="px-2.5 py-1.5 rounded-md bg-white/5 text-xs text-muted-foreground border border-white/5">
+                      <span key={cmd.trigger} className="px-2.5 py-1.5 rounded-md bg-muted text-xs text-muted-foreground border border-border">
                         <span className="font-mono text-primary mr-1">{cmd.trigger}</span>
                         {cmd.name}
                       </span>
@@ -860,10 +914,10 @@ function MessageBubble({ message, agents, isLastAssistantMessage, isStreaming, o
         <div className={cn(
           "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-1",
           isUser
-            ? "bg-secondary"
-            : "bg-gradient-to-br from-primary/80 to-accent/80 text-white shadow-lg shadow-primary/20"
+            ? "bg-muted border border-border"
+            : "bg-primary text-white shadow-sm"
         )}>
-          {isUser ? <User size={16} /> : (
+          {isUser ? <User size={16} className="text-muted-foreground" /> : (
             agent ? <span className="text-sm">{agent.icon}</span> : <Bot size={16} />
           )}
         </div>
@@ -875,7 +929,7 @@ function MessageBubble({ message, agents, isLastAssistantMessage, isStreaming, o
             "px-5 py-3.5 rounded-2xl text-sm leading-relaxed",
             isUser
               ? "bg-primary text-primary-foreground rounded-tr-sm max-w-[85%]"
-              : "glass-card text-foreground rounded-tl-sm border border-white/5 max-w-full min-w-[300px]"
+              : "bg-white text-foreground rounded-tl-sm border border-border shadow-sm max-w-full min-w-[300px]"
           )}>
             {isUser ? (
               message.content
@@ -895,20 +949,20 @@ function MessageBubble({ message, agents, isLastAssistantMessage, isStreaming, o
 }
 
 const DOC_TYPE_ICONS: Record<string, { icon: string; color: string }> = {
-  "product-brief": { icon: "📋", color: "text-blue-400" },
-  "brainstorm": { icon: "💡", color: "text-yellow-300" },
-  "market-research": { icon: "📊", color: "text-green-400" },
-  "prd": { icon: "📄", color: "text-purple-400" },
-  "ux-design": { icon: "🎨", color: "text-pink-400" },
-  "architecture": { icon: "🏗️", color: "text-orange-400" },
-  "epic": { icon: "📦", color: "text-yellow-400" },
-  "stories": { icon: "📝", color: "text-cyan-400" },
-  "sprint-plan": { icon: "🏃", color: "text-emerald-400" },
-  "implementation-plan": { icon: "⚙️", color: "text-amber-400" },
-  "code-review": { icon: "🔍", color: "text-red-400" },
-  "qa-report": { icon: "✅", color: "text-teal-400" },
-  "test-plan": { icon: "🧪", color: "text-indigo-400" },
-  "general": { icon: "📎", color: "text-gray-400" },
+  "product-brief": { icon: "📋", color: "text-blue-600" },
+  "brainstorm": { icon: "💡", color: "text-yellow-600" },
+  "market-research": { icon: "📊", color: "text-green-600" },
+  "prd": { icon: "📄", color: "text-purple-600" },
+  "ux-design": { icon: "🎨", color: "text-pink-600" },
+  "architecture": { icon: "🏗️", color: "text-orange-600" },
+  "epic": { icon: "📦", color: "text-yellow-600" },
+  "stories": { icon: "📝", color: "text-cyan-600" },
+  "sprint-plan": { icon: "🏃", color: "text-emerald-600" },
+  "implementation-plan": { icon: "⚙️", color: "text-amber-600" },
+  "code-review": { icon: "🔍", color: "text-red-600" },
+  "qa-report": { icon: "✅", color: "text-teal-600" },
+  "test-plan": { icon: "🧪", color: "text-indigo-600" },
+  "general": { icon: "📎", color: "text-gray-500" },
 };
 
 function DocumentsPanel({
@@ -924,8 +978,8 @@ function DocumentsPanel({
   const [scanning, setScanning] = useState(false);
 
   return (
-    <div className="w-80 border-l border-border/50 glass-panel flex flex-col shrink-0 hidden lg:flex animate-in slide-in-from-right-5 duration-300" data-testid="documents-panel">
-      <div className="p-3 border-b border-border/50 flex items-center justify-between">
+    <div className="w-80 border-l border-border bg-white flex flex-col shrink-0 hidden lg:flex animate-in slide-in-from-right-5 duration-300" data-testid="documents-panel">
+      <div className="p-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FileText size={14} className="text-primary" />
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Documents</span>
@@ -940,7 +994,7 @@ function DocumentsPanel({
             data-testid="button-scan-docs"
             onClick={async () => { setScanning(true); await onScan(); setScanning(false); }}
             disabled={scanning}
-            className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             title="Scan conversations for documents"
           >
             {scanning ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
@@ -948,7 +1002,7 @@ function DocumentsPanel({
           <button
             data-testid="button-close-docs"
             onClick={onClose}
-            className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             <X size={14} />
           </button>
@@ -957,18 +1011,18 @@ function DocumentsPanel({
 
       {viewingDoc ? (
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="p-3 border-b border-border/50 flex items-center gap-2">
+          <div className="p-3 border-b border-border flex items-center gap-2">
             <button
               data-testid="button-back-to-docs"
               onClick={() => onViewDoc(null)}
-              className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+              className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft size={14} />
             </button>
             <span className="text-xs font-medium truncate flex-1">{viewingDoc.title}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            <div className="prose prose-invert prose-sm max-w-none">
+            <div className="prose prose-sm max-w-none">
               <ReactMarkdown>{viewingDoc.content}</ReactMarkdown>
             </div>
           </div>
@@ -977,7 +1031,7 @@ function DocumentsPanel({
         <div className="flex-1 overflow-y-auto py-2 px-2 space-y-1">
           {documents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4 py-8">
-              <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
+              <div className="w-12 h-12 rounded-xl bg-muted border border-border flex items-center justify-center mb-3">
                 <FileText size={20} className="text-muted-foreground" />
               </div>
               <p className="text-xs text-muted-foreground mb-1 font-medium">No documents yet</p>
@@ -992,7 +1046,7 @@ function DocumentsPanel({
                 <div
                   key={doc.id}
                   data-testid={`doc-item-${doc.id}`}
-                  className="group glass-card rounded-lg border border-white/5 hover:border-primary/20 transition-all cursor-pointer"
+                  className="group bg-white rounded-lg border border-border hover:border-primary/20 hover:shadow-sm transition-all cursor-pointer"
                 >
                   <div className="p-3" onClick={() => onViewDoc(doc)}>
                     <div className="flex items-start gap-2.5">
@@ -1000,7 +1054,7 @@ function DocumentsPanel({
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-foreground truncate">{doc.title}</div>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-white/5", typeInfo.color)}>
+                          <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted", typeInfo.color)}>
                             {doc.docType.replace("-", " ")}
                           </span>
                         </div>
@@ -1026,7 +1080,7 @@ function DocumentsPanel({
                     <button
                       data-testid={`button-delete-doc-${doc.id}`}
                       onClick={() => onDeleteDoc(doc.id)}
-                      className="flex items-center justify-center gap-1 px-2 py-1 rounded-md bg-red-500/10 text-red-400 text-[10px] hover:bg-red-500/20 transition-colors"
+                      className="flex items-center justify-center gap-1 px-2 py-1 rounded-md bg-red-50 text-red-500 text-[10px] hover:bg-red-100 transition-colors"
                     >
                       <Trash2 size={10} />
                     </button>

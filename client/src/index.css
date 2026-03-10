@@ -34,65 +34,35 @@
 }
 
 :root {
-  --background: 230 25% 10%;
-  --foreground: 210 40% 98%;
+  --background: 220 20% 97%;
+  --foreground: 220 30% 15%;
 
-  --card: 230 25% 14%;
-  --card-foreground: 210 40% 98%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 30% 15%;
 
-  --popover: 230 25% 12%;
-  --popover-foreground: 210 40% 98%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 30% 15%;
 
-  --primary: 250 100% 65%;
-  --primary-foreground: 210 40% 98%;
+  --primary: 215 75% 30%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 230 25% 20%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 220 15% 94%;
+  --secondary-foreground: 220 30% 15%;
 
-  --muted: 230 25% 20%;
-  --muted-foreground: 215 20% 65%;
+  --muted: 220 15% 94%;
+  --muted-foreground: 220 10% 50%;
 
-  --accent: 280 100% 65%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 168 55% 35%;
+  --accent-foreground: 0 0% 100%;
 
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 230 25% 25%;
-  --input: 230 25% 25%;
-  --ring: 250 100% 65%;
+  --border: 220 15% 88%;
+  --input: 220 15% 88%;
+  --ring: 215 75% 30%;
 
-  --radius: 0.75rem;
-}
-
-.dark {
-  --background: 230 25% 7%;
-  --foreground: 210 40% 98%;
-
-  --card: 230 25% 11%;
-  --card-foreground: 210 40% 98%;
-
-  --popover: 230 25% 11%;
-  --popover-foreground: 210 40% 98%;
-
-  --primary: 250 100% 65%;
-  --primary-foreground: 210 40% 98%;
-
-  --secondary: 230 25% 16%;
-  --secondary-foreground: 210 40% 98%;
-
-  --muted: 230 25% 16%;
-  --muted-foreground: 215 20% 65%;
-
-  --accent: 280 100% 65%;
-  --accent-foreground: 210 40% 98%;
-
-  --destructive: 0 62% 30%;
-  --destructive-foreground: 210 40% 98%;
-
-  --border: 230 25% 20%;
-  --input: 230 25% 20%;
-  --ring: 250 100% 65%;
+  --radius: 0.625rem;
 }
 
 @layer base {
@@ -100,11 +70,7 @@
     @apply border-border;
   }
   body {
-    @apply font-sans antialiased bg-background text-foreground selection:bg-primary/30;
-    background-image: 
-      radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-      radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.08) 0%, transparent 50%);
-    background-attachment: fixed;
+    @apply font-sans antialiased bg-background text-foreground selection:bg-primary/20;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
@@ -112,30 +78,48 @@
 }
 
 .glass-panel {
-  background: rgba(30, 31, 40, 0.6);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(40, 42, 54, 0.8) 0%, rgba(30, 31, 40, 0.6) 100%);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
 }
 
 .glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15);
-  transform: translateY(-2px);
+  border-color: hsl(215 75% 30% / 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+  background: linear-gradient(135deg, hsl(215 75% 30%) 0%, hsl(168 55% 35%) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.prose {
+  --tw-prose-body: hsl(220 30% 25%);
+  --tw-prose-headings: hsl(220 30% 15%);
+  --tw-prose-links: hsl(215 75% 30%);
+  --tw-prose-bold: hsl(220 30% 15%);
+  --tw-prose-counters: hsl(220 10% 50%);
+  --tw-prose-bullets: hsl(220 10% 50%);
+  --tw-prose-hr: hsl(220 15% 88%);
+  --tw-prose-quotes: hsl(220 30% 25%);
+  --tw-prose-quote-borders: hsl(215 75% 30% / 0.3);
+  --tw-prose-captions: hsl(220 10% 50%);
+  --tw-prose-code: hsl(215 75% 30%);
+  --tw-prose-pre-code: hsl(220 30% 25%);
+  --tw-prose-pre-bg: hsl(220 20% 95%);
+  --tw-prose-th-borders: hsl(220 15% 88%);
+  --tw-prose-td-borders: hsl(220 15% 92%);
 }

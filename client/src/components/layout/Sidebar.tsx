@@ -34,15 +34,15 @@ export function Sidebar() {
       </button>
 
       <aside className={cn(
-        "fixed md:sticky top-0 left-0 h-screen w-64 glass-panel border-r border-border/50 flex flex-col transition-transform duration-300 z-40",
+        "fixed md:sticky top-0 left-0 h-screen w-64 bg-white border-r border-border flex flex-col transition-transform duration-300 z-40",
         isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}>
-        <div className="p-6 flex items-center gap-3 border-b border-border/50">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+        <div className="p-6 flex items-center gap-3 border-b border-border">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <Bot size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="font-heading font-bold text-lg leading-none" data-testid="text-app-title">BMad</h1>
+            <h1 className="font-heading font-bold text-lg leading-none text-foreground" data-testid="text-app-title">BMad</h1>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
               <Sparkles size={10} className="text-accent" />
               OpenAI Edition
@@ -50,8 +50,8 @@ export function Sidebar() {
           </div>
         </div>
 
-        <div className="flex-1 py-6 px-4 flex flex-col gap-2">
-          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+        <div className="flex-1 py-6 px-4 flex flex-col gap-1">
+          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
             Navigation
           </div>
           {NAV_ITEMS.map((item) => {
@@ -64,8 +64,8 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
                   isActive 
-                    ? "bg-primary/10 text-primary font-medium" 
-                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                    ? "bg-primary/8 text-primary font-medium" 
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <item.icon size={18} className={cn(
