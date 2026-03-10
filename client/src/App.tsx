@@ -8,6 +8,7 @@ import Agents from "@/pages/Agents";
 import Workflows from "@/pages/Workflows";
 import Projects from "@/pages/Projects";
 import ProjectDetail from "@/pages/ProjectDetail";
+import Guide from "@/pages/Guide";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/agents" component={Agents} />
       <Route path="/workflows" component={Workflows} />
+      <Route path="/guide" component={Guide} />
       <Route component={NotFound} />
     </Switch>
   );

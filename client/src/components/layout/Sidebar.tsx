@@ -8,7 +8,8 @@ import {
   Sparkles,
   Menu,
   X,
-  FolderKanban
+  FolderKanban,
+  BookOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Chat", icon: MessageSquare },
   { href: "/agents", label: "Agents", icon: Users },
   { href: "/workflows", label: "Workflows", icon: GitBranch },
+  { href: "/guide", label: "Guide", icon: BookOpen },
 ];
 
 export function Sidebar() {
