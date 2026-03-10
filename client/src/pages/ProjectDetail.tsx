@@ -17,6 +17,7 @@ import {
 import type { Agent, ChatMessage, Session, Project, Document } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import { InteractiveResponse } from "@/components/InteractiveResponse";
+import BoardView from "@/components/BoardView";
 
 const COMMAND_AGENT_MAP: Record<string, string> = {
   BP: "Mary", MR: "Mary", CB: "Mary",
@@ -76,7 +77,7 @@ const BMAD_PHASES = [
   }
 ];
 
-type Tab = "chat" | "workflows";
+type Tab = "chat" | "workflows" | "board";
 
 const COMMAND_PREREQUISITES: Record<string, { requires: string[]; label: string }> = {
   MR: { requires: ["brainstorm"], label: "Brainstorm Summary" },
@@ -387,6 +388,19 @@ export default function ProjectDetail() {
                 Chat
               </button>
               <button
+                data-testid="tab-board"
+                onClick={() => setActiveTab("board")}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors",
+                  activeTab === "board"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+              >
+                <FolderKanban size={14} />
+                Board
+              </button>
+              <button
                 data-testid="tab-workflows"
                 onClick={() => setActiveTab("workflows")}
                 className={cn(
@@ -451,6 +465,10 @@ export default function ProjectDetail() {
                 }}
               />
             )}
+          </div>
+        ) : activeTab === "board" ? (
+          <div className="flex-1 overflow-auto">
+            <BoardView projectId={projectId} />
           </div>
         ) : (
           <WorkflowsView phase={project.phase} />

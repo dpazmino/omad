@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { agents, sessions, messages, workflows, projects, documents, type Agent, type InsertAgent, type Session, type InsertSession, type ChatMessage, type InsertMessage, type Workflow, type InsertWorkflow, type Project, type InsertProject, type Document, type InsertDocument } from "@shared/schema";
+import { agents, sessions, messages, workflows, projects, documents, epics, sprints, stories, type Agent, type InsertAgent, type Session, type InsertSession, type ChatMessage, type InsertMessage, type Workflow, type InsertWorkflow, type Project, type InsertProject, type Document, type InsertDocument, type Epic, type InsertEpic, type Sprint, type InsertSprint, type Story, type InsertStory } from "@shared/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 
 export interface IStorage {
@@ -35,6 +35,26 @@ export interface IStorage {
   createDocument(doc: InsertDocument): Promise<Document>;
   updateDocument(id: number, data: Partial<InsertDocument>): Promise<Document>;
   deleteDocument(id: number): Promise<void>;
+
+  getEpicsByProject(projectId: number): Promise<Epic[]>;
+  getEpic(id: number): Promise<Epic | undefined>;
+  createEpic(epic: InsertEpic): Promise<Epic>;
+  updateEpic(id: number, data: Partial<InsertEpic>): Promise<Epic>;
+  deleteEpic(id: number): Promise<void>;
+
+  getSprintsByProject(projectId: number): Promise<Sprint[]>;
+  getSprint(id: number): Promise<Sprint | undefined>;
+  createSprint(sprint: InsertSprint): Promise<Sprint>;
+  updateSprint(id: number, data: Partial<InsertSprint>): Promise<Sprint>;
+  deleteSprint(id: number): Promise<void>;
+
+  getStoriesByProject(projectId: number): Promise<Story[]>;
+  getStoriesByEpic(epicId: number): Promise<Story[]>;
+  getStoriesBySprint(sprintId: number): Promise<Story[]>;
+  getStory(id: number): Promise<Story | undefined>;
+  createStory(story: InsertStory): Promise<Story>;
+  updateStory(id: number, data: Partial<InsertStory>): Promise<Story>;
+  deleteStory(id: number): Promise<void>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -167,6 +187,85 @@ class DatabaseStorage implements IStorage {
 
   async deleteDocument(id: number): Promise<void> {
     await db.delete(documents).where(eq(documents.id, id));
+  }
+
+  async getEpicsByProject(projectId: number): Promise<Epic[]> {
+    return db.select().from(epics).where(eq(epics.projectId, projectId)).orderBy(epics.createdAt);
+  }
+
+  async getEpic(id: number): Promise<Epic | undefined> {
+    const [epic] = await db.select().from(epics).where(eq(epics.id, id));
+    return epic;
+  }
+
+  async createEpic(epic: InsertEpic): Promise<Epic> {
+    const [created] = await db.insert(epics).values(epic).returning();
+    return created;
+  }
+
+  async updateEpic(id: number, data: Partial<InsertEpic>): Promise<Epic> {
+    const [updated] = await db.update(epics).set({ ...data, updatedAt: sql`CURRENT_TIMESTAMP` }).where(eq(epics.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEpic(id: number): Promise<void> {
+    await db.delete(stories).where(eq(stories.epicId, id));
+    await db.delete(epics).where(eq(epics.id, id));
+  }
+
+  async getSprintsByProject(projectId: number): Promise<Sprint[]> {
+    return db.select().from(sprints).where(eq(sprints.projectId, projectId)).orderBy(sprints.createdAt);
+  }
+
+  async getSprint(id: number): Promise<Sprint | undefined> {
+    const [sprint] = await db.select().from(sprints).where(eq(sprints.id, id));
+    return sprint;
+  }
+
+  async createSprint(sprint: InsertSprint): Promise<Sprint> {
+    const [created] = await db.insert(sprints).values(sprint).returning();
+    return created;
+  }
+
+  async updateSprint(id: number, data: Partial<InsertSprint>): Promise<Sprint> {
+    const [updated] = await db.update(sprints).set({ ...data, updatedAt: sql`CURRENT_TIMESTAMP` }).where(eq(sprints.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSprint(id: number): Promise<void> {
+    await db.update(stories).set({ sprintId: null }).where(eq(stories.sprintId, id));
+    await db.delete(sprints).where(eq(sprints.id, id));
+  }
+
+  async getStoriesByProject(projectId: number): Promise<Story[]> {
+    return db.select().from(stories).where(eq(stories.projectId, projectId)).orderBy(stories.createdAt);
+  }
+
+  async getStoriesByEpic(epicId: number): Promise<Story[]> {
+    return db.select().from(stories).where(eq(stories.epicId, epicId)).orderBy(stories.createdAt);
+  }
+
+  async getStoriesBySprint(sprintId: number): Promise<Story[]> {
+    return db.select().from(stories).where(eq(stories.sprintId, sprintId)).orderBy(stories.createdAt);
+  }
+
+  async getStory(id: number): Promise<Story | undefined> {
+    const [story] = await db.select().from(stories).where(eq(stories.id, id));
+    return story;
+  }
+
+  async createStory(story: InsertStory): Promise<Story> {
+    const [created] = await db.insert(stories).values(story).returning();
+    return created;
+  }
+
+  async updateStory(id: number, data: Partial<InsertStory>): Promise<Story> {
+    const [updated] = await db.update(stories).set({ ...data, updatedAt: sql`CURRENT_TIMESTAMP` }).where(eq(stories.id, id)).returning();
+    return updated;
+  }
+
+  async deleteStory(id: number): Promise<void> {
+    await db.delete(stories).where(eq(stories.id, id));
   }
 }
 

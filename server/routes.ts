@@ -508,5 +508,185 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  // ── Epics ──
+  app.get("/api/projects/:id/epics", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const result = await storage.getEpicsByProject(projectId);
+    res.json(result);
+  });
+
+  app.post("/api/projects/:id/epics", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const epic = await storage.createEpic({ ...req.body, projectId });
+    res.status(201).json(epic);
+  });
+
+  app.patch("/api/epics/:id", async (req, res) => {
+    const updated = await storage.updateEpic(parseInt(req.params.id), req.body);
+    res.json(updated);
+  });
+
+  app.delete("/api/epics/:id", async (req, res) => {
+    await storage.deleteEpic(parseInt(req.params.id));
+    res.status(204).end();
+  });
+
+  // ── Sprints ──
+  app.get("/api/projects/:id/sprints", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const result = await storage.getSprintsByProject(projectId);
+    res.json(result);
+  });
+
+  app.post("/api/projects/:id/sprints", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const sprint = await storage.createSprint({ ...req.body, projectId });
+    res.status(201).json(sprint);
+  });
+
+  app.patch("/api/sprints/:id", async (req, res) => {
+    const updated = await storage.updateSprint(parseInt(req.params.id), req.body);
+    res.json(updated);
+  });
+
+  app.delete("/api/sprints/:id", async (req, res) => {
+    await storage.deleteSprint(parseInt(req.params.id));
+    res.status(204).end();
+  });
+
+  // ── Stories ──
+  app.get("/api/projects/:id/stories", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const result = await storage.getStoriesByProject(projectId);
+    res.json(result);
+  });
+
+  app.get("/api/epics/:id/stories", async (req, res) => {
+    const result = await storage.getStoriesByEpic(parseInt(req.params.id));
+    res.json(result);
+  });
+
+  app.post("/api/projects/:id/stories", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const story = await storage.createStory({ ...req.body, projectId });
+    res.status(201).json(story);
+  });
+
+  app.patch("/api/stories/:id", async (req, res) => {
+    const updated = await storage.updateStory(parseInt(req.params.id), req.body);
+    res.json(updated);
+  });
+
+  app.delete("/api/stories/:id", async (req, res) => {
+    await storage.deleteStory(parseInt(req.params.id));
+    res.status(204).end();
+  });
+
+  // ── Import Epics/Stories from Document ──
+  app.post("/api/projects/:id/import-epics", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    const docs = await storage.getDocumentsByProject(projectId);
+    const epicDoc = docs.find(d => d.docType === "epic" || d.docType === "stories");
+    if (!epicDoc) return res.status(404).json({ error: "No epic/stories document found. Run CE command first." });
+
+    const parsed = parseEpicsFromDocument(epicDoc.content);
+    const created = { epics: 0, stories: 0 };
+
+    for (const ep of parsed) {
+      const epic = await storage.createEpic({ projectId, title: ep.title, description: ep.description, status: "backlog", priority: "medium" });
+      created.epics++;
+      for (const st of ep.stories) {
+        await storage.createStory({ epicId: epic.id, projectId, title: st.title, description: st.description, acceptanceCriteria: st.acceptanceCriteria, status: "backlog", priority: st.priority || "medium", storyPoints: st.storyPoints });
+        created.stories++;
+      }
+    }
+
+    res.json({ imported: created, message: `Imported ${created.epics} epics and ${created.stories} stories` });
+  });
+
   return httpServer;
+}
+
+function parseEpicsFromDocument(content: string): { title: string; description: string; stories: { title: string; description: string; acceptanceCriteria: string; priority?: string; storyPoints?: number }[] }[] {
+  const result: { title: string; description: string; stories: { title: string; description: string; acceptanceCriteria: string; priority?: string; storyPoints?: number }[] }[] = [];
+  const lines = content.split("\n");
+  let currentEpic: { title: string; description: string; stories: { title: string; description: string; acceptanceCriteria: string; priority?: string; storyPoints?: number }[] } | null = null;
+  let currentStory: { title: string; description: string; acceptanceCriteria: string; priority?: string; storyPoints?: number } | null = null;
+  let collectingAC = false;
+  let acLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    const epicMatch = trimmed.match(/^#{1,2}\s+(?:[^a-zA-Z]*\s*)?epic\s*\d*[:\s]*(.+)/i);
+    if (epicMatch) {
+      if (currentStory && currentEpic) {
+        if (collectingAC) currentStory.acceptanceCriteria = acLines.join("\n");
+        currentEpic.stories.push(currentStory);
+        currentStory = null;
+      }
+      if (currentEpic) result.push(currentEpic);
+      currentEpic = { title: epicMatch[1].replace(/\*{1,2}/g, "").trim(), description: "", stories: [] };
+      collectingAC = false;
+      acLines = [];
+      continue;
+    }
+
+    const storyMatch = trimmed.match(/^#{2,4}\s+(?:[^a-zA-Z]*\s*)?(?:user\s+)?story\s*\d*[:\s]*(.+)/i);
+    if (storyMatch && currentEpic) {
+      if (currentStory) {
+        if (collectingAC) currentStory.acceptanceCriteria = acLines.join("\n");
+        currentEpic.stories.push(currentStory);
+      }
+      currentStory = { title: storyMatch[1].replace(/\*{1,2}/g, "").trim(), description: "", acceptanceCriteria: "" };
+      collectingAC = false;
+      acLines = [];
+      continue;
+    }
+
+    if (trimmed.match(/^(?:\*{0,2})acceptance\s+criteria/i)) {
+      collectingAC = true;
+      acLines = [];
+      continue;
+    }
+
+    if (trimmed.match(/^(?:\*{0,2})(?:story\s+)?points?\s*[:\s]*(\d+)/i) && currentStory) {
+      const pts = trimmed.match(/(\d+)/);
+      if (pts) currentStory.storyPoints = parseInt(pts[1]);
+      continue;
+    }
+
+    if (trimmed.match(/^(?:\*{0,2})priority\s*[:\s]*(low|medium|high|critical)/i) && currentStory) {
+      const p = trimmed.match(/(low|medium|high|critical)/i);
+      if (p) currentStory.priority = p[1].toLowerCase();
+      continue;
+    }
+
+    if (collectingAC && currentStory) {
+      if (trimmed.startsWith("#") || (trimmed === "" && acLines.length > 0 && lines[i + 1]?.trim().startsWith("#"))) {
+        currentStory.acceptanceCriteria = acLines.join("\n");
+        collectingAC = false;
+      } else {
+        acLines.push(trimmed);
+      }
+    } else if (currentStory && !collectingAC && trimmed && !trimmed.startsWith("#")) {
+      if (currentStory.description) currentStory.description += "\n" + trimmed;
+      else currentStory.description = trimmed;
+    } else if (currentEpic && !currentStory && trimmed && !trimmed.startsWith("#")) {
+      if (currentEpic.description) currentEpic.description += "\n" + trimmed;
+      else currentEpic.description = trimmed;
+    }
+  }
+
+  if (currentStory && currentEpic) {
+    if (collectingAC) currentStory.acceptanceCriteria = acLines.join("\n");
+    currentEpic.stories.push(currentStory);
+  }
+  if (currentEpic) result.push(currentEpic);
+
+  return result;
 }

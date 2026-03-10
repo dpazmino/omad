@@ -77,6 +77,45 @@ export const documents = pgTable("documents", {
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
+export const epics = pgTable("epics", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status").notNull().default("backlog"),
+  priority: text("priority").notNull().default("medium"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const sprints = pgTable("sprints", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  goal: text("goal").notNull().default(""),
+  status: text("status").notNull().default("planning"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const stories = pgTable("stories", {
+  id: serial("id").primaryKey(),
+  epicId: integer("epic_id").notNull().references(() => epics.id, { onDelete: "cascade" }),
+  sprintId: integer("sprint_id").references(() => sprints.id, { onDelete: "set null" }),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  acceptanceCriteria: text("acceptance_criteria").notNull().default(""),
+  status: text("status").notNull().default("backlog"),
+  priority: text("priority").notNull().default("medium"),
+  storyPoints: integer("story_points"),
+  assignee: text("assignee"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
 export const insertAgentSchema = createInsertSchema(agents).omit({ id: true, createdAt: true });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
@@ -96,3 +135,14 @@ export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+
+export const insertEpicSchema = createInsertSchema(epics).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSprintSchema = createInsertSchema(sprints).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStorySchema = createInsertSchema(stories).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type Epic = typeof epics.$inferSelect;
+export type InsertEpic = z.infer<typeof insertEpicSchema>;
+export type Sprint = typeof sprints.$inferSelect;
+export type InsertSprint = z.infer<typeof insertSprintSchema>;
+export type Story = typeof stories.$inferSelect;
+export type InsertStory = z.infer<typeof insertStorySchema>;

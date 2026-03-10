@@ -24,6 +24,15 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
 - **Command Prerequisites**: Commands check for required documents before executing (e.g., MR needs brainstorm, CP needs product-brief). Buttons show disabled with tooltip when prerequisites aren't met. When prerequisites are met, document content is automatically injected as context.
 - **Workflow Guide**: Visual reference for the 4-phase BMad development lifecycle per project
 - **Phase Tracking**: Projects track their current BMad phase (analysis → planning → solutioning → implementation)
+- **Board View (Jira-like)**: Project board with epics, sprints, and stories. Accessible via "Board" tab in ProjectDetail. Features:
+  - Epic list view with collapsible epics and story rows
+  - Kanban board with 5-column layout (Backlog, To Do, In Progress, Review, Done)
+  - Sprint filter to view stories by sprint
+  - Story detail modal with full description, acceptance criteria, status/priority management
+  - Inline create forms for epics, stories, and sprints
+  - Import from CE (Create Epics) command output via `parseEpicsFromDocument()`
+  - Component: `client/src/components/BoardView.tsx`
+  - API: `/api/projects/:id/epics`, `/api/projects/:id/sprints`, `/api/projects/:id/stories`, `/api/projects/:id/import-epics`
 
 ## File Structure
 ```
@@ -56,12 +65,18 @@ server/replit_integrations/  - AI integration modules (chat, audio, image, batch
 - `messages` - Chat message history with agent attribution
 - `workflows` - Workflow tracking scoped to projects (projectId FK)
 - `documents` - Auto-detected project artifacts (title, docType, content, agentName, phase, projectId, sessionId, messageId)
+- `epics` - Project epics (title, description, status, priority, projectId FK)
+- `sprints` - Project sprints (name, goal, status, startDate, endDate, projectId FK)
+- `stories` - User stories (title, description, acceptanceCriteria, status, priority, storyPoints, assignee, epicId FK, sprintId FK nullable, projectId FK)
 
 ## Data Model
 - Projects are the top-level entity
 - Sessions belong to a project (via `projectId` column)
 - Workflows belong to a project (via `projectId` column)
 - Documents belong to a project (via `projectId` column, cascade delete)
+- Epics belong to a project (via `projectId` column)
+- Sprints belong to a project (via `projectId` column)
+- Stories belong to an epic (via `epicId` column), optionally to a sprint (via `sprintId`), and to a project (via `projectId`)
 - Messages belong to a session
 - Deleting a project cascades to its sessions, messages, workflows, and documents
 
