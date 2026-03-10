@@ -343,9 +343,44 @@ function KanbanBoard({ stories, epics, sprints, selectedSprint, onSelectSprint, 
   onSelectSprint: (id: number | null) => void; onEditStory: (s: Story) => void;
   projectId: number; onInvalidate: () => void;
 }) {
+  const [draggedStoryId, setDraggedStoryId] = useState<number | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
+
   const filtered = selectedSprint !== null
     ? stories.filter(s => s.sprintId === selectedSprint)
     : stories;
+
+  const handleDragStart = (e: React.DragEvent, storyId: number) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(storyId));
+    setDraggedStoryId(storyId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, status: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverStatus(status);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverStatus(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, newStatus: string) => {
+    e.preventDefault();
+    setDragOverStatus(null);
+    setDraggedStoryId(null);
+    const storyId = parseInt(e.dataTransfer.getData("text/plain"));
+    const story = stories.find(s => s.id === storyId);
+    if (!story || story.status === newStatus) return;
+    await apiPatch(`/api/stories/${storyId}`, { status: newStatus });
+    onInvalidate();
+  };
+
+  const handleDragEnd = () => {
+    setDraggedStoryId(null);
+    setDragOverStatus(null);
+  };
 
   return (
     <div className="flex flex-col h-full gap-3">
@@ -390,22 +425,37 @@ function KanbanBoard({ stories, epics, sprints, selectedSprint, onSelectSprint, 
             : filtered.filter(s => s.status === status);
 
           return (
-            <div key={status} className="flex flex-col min-w-[200px]">
+            <div
+              key={status}
+              className="flex flex-col min-w-[200px]"
+              onDragOver={(e) => handleDragOver(e, status)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, status)}
+            >
               <div className={cn("flex items-center justify-between px-3 py-2 rounded-t-lg border border-b-0",
                 STATUS_COLORS[status]
               )}>
                 <span className="text-xs font-semibold">{STATUS_LABELS[status]}</span>
                 <span className="text-xs opacity-70">{columnStories.length}</span>
               </div>
-              <div className="flex-1 bg-muted/20 border border-border rounded-b-lg p-2 space-y-2 overflow-auto">
+              <div className={cn(
+                "flex-1 border border-border rounded-b-lg p-2 space-y-2 overflow-auto transition-colors",
+                dragOverStatus === status ? "bg-primary/5 border-primary/30" : "bg-muted/20"
+              )}>
                 {columnStories.map(story => {
                   const epic = epics.find(e => e.id === story.epicId);
                   return (
                     <div
                       key={story.id}
                       data-testid={`kanban-card-${story.id}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, story.id)}
+                      onDragEnd={handleDragEnd}
                       onClick={() => onEditStory(story)}
-                      className="glass-card rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow group"
+                      className={cn(
+                        "glass-card rounded-lg p-3 cursor-grab hover:shadow-md transition-all group",
+                        draggedStoryId === story.id && "opacity-40 scale-95"
+                      )}
                     >
                       <div className="flex items-start justify-between gap-1">
                         <span className="text-sm font-medium text-foreground leading-tight">{story.title}</span>
