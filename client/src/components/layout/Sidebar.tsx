@@ -45,7 +45,7 @@ export function Sidebar() {
             <h1 className="font-heading font-bold text-lg leading-none text-foreground" data-testid="text-app-title">BMad</h1>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
               <Sparkles size={10} className="text-accent" />
-              OpenAI Edition
+              Claude Edition
             </p>
           </div>
         </div>

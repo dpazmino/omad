@@ -14,7 +14,7 @@ export default function Agents() {
         <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
           <div>
             <h1 className="text-3xl font-heading font-bold mb-2 text-foreground" data-testid="text-agents-title">Agent Team</h1>
-            <p className="text-muted-foreground">Your OpenAI-powered BMad development team.</p>
+            <p className="text-muted-foreground">Your Claude-powered BMad development team.</p>
           </div>
 
           {isLoading ? (

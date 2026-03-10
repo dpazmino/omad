@@ -287,21 +287,18 @@ export async function registerRoutes(
       for (const agent of partyAgents) {
         res.write(`data: ${JSON.stringify({ type: "agent_start", agentId: agent.id, agentName: `${agent.name} (${agent.title})` })}\n\n`);
 
-        const chatMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-          { role: "system", content: buildSystemPrompt(agent, true) },
-          ...baseHistory,
-        ];
+        const partySystemPrompt = buildSystemPrompt(agent, true);
 
         let agentStream;
         try {
-          agentStream = await openai.chat.completions.create({
-            model: agent.model || "gpt-5.2",
-            messages: chatMessages,
-            stream: true,
-            max_completion_tokens: 8192,
+          agentStream = anthropic.messages.stream({
+            model: agent.model || "claude-sonnet-4-6",
+            max_tokens: 8192,
+            system: partySystemPrompt,
+            messages: baseHistory,
           });
         } catch (apiError: any) {
-          console.error(`Party mode OpenAI error for ${agent.name}:`, apiError?.message);
+          console.error(`Party mode Anthropic error for ${agent.name}:`, apiError?.message);
           res.write(`data: ${JSON.stringify({ type: "content", content: `[Error: AI model could not respond — ${apiError?.message || "internal error"}]`, agentId: agent.id })}\n\n`);
           res.write(`data: ${JSON.stringify({ type: "agent_done", agentId: agent.id })}\n\n`);
           continue;
@@ -309,11 +306,13 @@ export async function registerRoutes(
 
         let agentResponse = "";
 
-        for await (const chunk of agentStream) {
-          const delta = chunk.choices[0]?.delta?.content || "";
-          if (delta) {
-            agentResponse += delta;
-            res.write(`data: ${JSON.stringify({ type: "content", content: delta, agentId: agent.id })}\n\n`);
+        for await (const event of agentStream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            const delta = event.delta.text;
+            if (delta) {
+              agentResponse += delta;
+              res.write(`data: ${JSON.stringify({ type: "content", content: delta, agentId: agent.id })}\n\n`);
+            }
           }
         }
 

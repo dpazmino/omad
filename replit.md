@@ -1,19 +1,19 @@
-# BMad Method - OpenAI Edition
+# BMad Method - Claude Edition
 
 ## Overview
-A web-based implementation of the BMad Method (Build More Architect Dreams), an AI-driven agile development framework. This version replaces the original CLI/skills-based approach with a full web UI powered by OpenAI via Replit AI Integrations.
+A web-based implementation of the BMad Method (Build More Architect Dreams), an AI-driven agile development framework. This version replaces the original CLI/skills-based approach with a full web UI powered by Anthropic Claude via Replit AI Integrations.
 
 ## Architecture
 - **Frontend**: React + TypeScript + Vite + Tailwind v4 + shadcn/ui
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
-- **AI**: OpenAI via Replit AI Integrations (gpt-5.2 model)
+- **AI**: Anthropic Claude via Replit AI Integrations (claude-sonnet-4-6 model, 200K context window)
 - **Styling**: Professional light banking theme — navy primary (hsl 215 75% 30%), teal accent (hsl 168 55% 35%), off-white backgrounds, white cards with subtle shadows
 
 ## Key Features
 - **Projects**: Central organizing concept — each project has its own sessions, workflows, and phase tracking
 - **7 BMad Agents**: Winston (Architect), John (PM), Mary (Analyst), Sally (UX), Bob (Scrum Master), DevAI (Developer), Quinn (QA)
-- **Real-time Chat**: Streaming SSE responses from OpenAI with agent personas (project-scoped)
+- **Real-time Chat**: Streaming SSE responses from Claude with agent personas (project-scoped)
 - **Interactive Responses**: Agent responses with questions/choices are parsed into interactive UI (radio buttons for MC, text inputs for open-ended). Located in `client/src/components/InteractiveResponse.tsx`
 - **Party Mode**: All active agents collaborate and respond sequentially
 - **Documents Panel**: Right-side panel shows auto-detected project artifacts (product briefs, PRDs, architecture docs, etc.)
@@ -21,6 +21,7 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
   - Manual scan via `/api/projects/:id/scan-documents` endpoint
   - Documents stored in `documents` table with project/session/message references
   - Panel supports viewing full document content, deleting, and scanning existing conversations
+- **Command Prerequisites**: Commands check for required documents before executing (e.g., MR needs brainstorm, CP needs product-brief). Buttons show disabled with tooltip when prerequisites aren't met. When prerequisites are met, document content is automatically injected as context.
 - **Workflow Guide**: Visual reference for the 4-phase BMad development lifecycle per project
 - **Phase Tracking**: Projects track their current BMad phase (analysis → planning → solutioning → implementation)
 
@@ -45,7 +46,7 @@ server/
 shared/
   schema.ts               - Drizzle schema (agents, sessions, messages, workflows, projects)
 
-server/replit_integrations/  - OpenAI integration modules (chat, audio, image, batch)
+server/replit_integrations/  - AI integration modules (chat, audio, image, batch)
 ```
 
 ## Database Tables
@@ -65,7 +66,7 @@ server/replit_integrations/  - OpenAI integration modules (chat, audio, image, b
 - Deleting a project cascades to its sessions, messages, workflows, and documents
 
 ## Environment
-- OpenAI access via `AI_INTEGRATIONS_OPENAI_BASE_URL` and `AI_INTEGRATIONS_OPENAI_API_KEY` (auto-configured)
+- Anthropic Claude access via `AI_INTEGRATIONS_ANTHROPIC_BASE_URL` and `AI_INTEGRATIONS_ANTHROPIC_API_KEY` (auto-configured)
 - Database via `DATABASE_URL` (auto-configured)
 - No user API keys required
 

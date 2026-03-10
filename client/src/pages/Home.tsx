@@ -186,7 +186,7 @@ export default function Home() {
             </button>
             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted px-3 py-1.5 rounded-full border border-border">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              OpenAI Connected
+              Claude Connected
             </div>
           </div>
         </header>
