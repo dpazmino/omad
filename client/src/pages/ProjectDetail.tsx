@@ -180,11 +180,11 @@ export default function ProjectDetail() {
     if (pendingCommand && pendingCommand.sessionId) {
       const { trigger, sessionId } = pendingCommand;
       setPendingCommand(null);
-      sendMessage(trigger, sessionId);
+      sendMessage(trigger, sessionId, true);
     }
   }, [pendingCommand]);
 
-  const sendMessage = async (messageContent: string, overrideSessionId?: number) => {
+  const sendMessage = async (messageContent: string, overrideSessionId?: number, skipAgentId?: boolean) => {
     const sid = overrideSessionId || activeSessionId;
     if (!messageContent.trim() || isStreaming || !sid) return;
 
@@ -224,7 +224,8 @@ export default function ProjectDetail() {
           }
         });
       } else {
-        await streamChat(sid, messageContent, activeAgent?.id || null, false, (event: StreamEvent) => {
+        const sendAgentId = skipAgentId ? null : (activeAgent?.id || null);
+        await streamChat(sid, messageContent, sendAgentId, false, (event: StreamEvent) => {
           handleError(event);
           if (event.type === "content") setStreamingContent(prev => prev + event.content);
         });
