@@ -19,6 +19,7 @@ interface ParsedContent {
 const LETTER_OPTION = /^[\s]*[-•*]?\s*\**([a-eA-E])\s*[).:\]]\**\s+(.+)/;
 const NUMBERED_OPTION = /^[\s]*(\d+)\s*[).]\s*\**(.+?)\**\s*$/;
 const DASH_OPTION = /^[\s]*[-•]\s+\**(.+?)\**\s*(?:\(.*\))?\s*$/;
+const LONG_DASH_ITEM = /^[\s]*[-•]\s+.{80,}/;
 const ENDS_WITH_QUESTION = /\?\s*\**\s*$/;
 const CHOOSE_PROMPT = /\b(?:choose|pick|select|which|reply with)\b/i;
 
@@ -228,19 +229,27 @@ function parseAgentResponse(content: string): ParsedContent | null {
       const choiceType = hasChoiceListAhead(lines, i + 1);
 
       if (choiceType === "dash") {
-        const cleanPrompt = trimmed.replace(/\*{1,2}/g, "").replace(/^[\s]*(?:#{1,4}\s+)?/, "").trim();
-        i++;
-        const { options, endIdx } = collectDashOptions(lines, i);
-        if (options.length >= 2 && options.length <= 8) {
-          foundInteractive = true;
-          questions.push({
-            id: questions.length + 1,
-            prompt: cleanPrompt,
-            type: "multiple-choice",
-            options,
-          });
-          i = endIdx;
-          continue;
+        const hasLongItems = (() => {
+          for (let k = i + 1; k < lines.length && lines[k].trim() !== ""; k++) {
+            if (LONG_DASH_ITEM.test(lines[k])) return true;
+          }
+          return false;
+        })();
+        if (!hasLongItems && isQuestionLine(trimmed)) {
+          const cleanPrompt = trimmed.replace(/\*{1,2}/g, "").replace(/^[\s]*(?:#{1,4}\s+)?/, "").trim();
+          i++;
+          const { options, endIdx } = collectDashOptions(lines, i);
+          if (options.length >= 2 && options.length <= 8) {
+            foundInteractive = true;
+            questions.push({
+              id: questions.length + 1,
+              prompt: cleanPrompt,
+              type: "multiple-choice",
+              options,
+            });
+            i = endIdx;
+            continue;
+          }
         }
       }
 
