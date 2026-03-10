@@ -189,15 +189,41 @@ export async function registerRoutes(
       // Send user message event
       res.write(`data: ${JSON.stringify({ type: "user_message", message: userMsg })}\n\n`);
 
-      // Stream OpenAI response
-      const stream = await openai.chat.completions.create({
-        model: agent.model || "gpt-5.2",
-        messages: chatMessages,
-        stream: true,
-        max_completion_tokens: 8192,
-      });
+      const MAX_CONTEXT_CHARS = 80000;
+      let totalChars = chatMessages.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0), 0);
+      if (totalChars > MAX_CONTEXT_CHARS) {
+        const systemMsg = chatMessages[0];
+        const nonSystemMsgs = chatMessages.slice(1);
+        const trimmed: typeof nonSystemMsgs = [];
+        let charBudget = MAX_CONTEXT_CHARS - (typeof systemMsg.content === "string" ? systemMsg.content.length : 0);
+        for (let i = nonSystemMsgs.length - 1; i >= 0; i--) {
+          const len = typeof nonSystemMsgs[i].content === "string" ? nonSystemMsgs[i].content.length : 0;
+          if (charBudget - len < 0 && trimmed.length >= 2) break;
+          charBudget -= len;
+          trimmed.unshift(nonSystemMsgs[i]);
+        }
+        chatMessages.length = 0;
+        chatMessages.push(systemMsg, ...trimmed);
+      }
 
       let fullResponse = "";
+      let stream;
+      try {
+        stream = await openai.chat.completions.create({
+          model: agent.model || "gpt-5.2",
+          messages: chatMessages,
+          stream: true,
+          max_completion_tokens: 8192,
+        });
+      } catch (apiError: any) {
+        console.error("OpenAI API error:", apiError?.message || apiError);
+        const errorMsg = apiError?.status === 400
+          ? "The AI model encountered an error processing this request. The conversation may be too long — try starting a new session."
+          : `AI service error: ${apiError?.message || "Unknown error"}`;
+        res.write(`data: ${JSON.stringify({ type: "error", error: errorMsg })}\n\n`);
+        res.end();
+        return;
+      }
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content || "";
@@ -289,16 +315,24 @@ export async function registerRoutes(
           ...baseHistory,
         ];
 
-        const stream = await openai.chat.completions.create({
-          model: agent.model || "gpt-5.2",
-          messages: chatMessages,
-          stream: true,
-          max_completion_tokens: 8192,
-        });
+        let agentStream;
+        try {
+          agentStream = await openai.chat.completions.create({
+            model: agent.model || "gpt-5.2",
+            messages: chatMessages,
+            stream: true,
+            max_completion_tokens: 8192,
+          });
+        } catch (apiError: any) {
+          console.error(`Party mode OpenAI error for ${agent.name}:`, apiError?.message);
+          res.write(`data: ${JSON.stringify({ type: "content", content: `[Error: AI model could not respond — ${apiError?.message || "internal error"}]`, agentId: agent.id })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: "agent_done", agentId: agent.id })}\n\n`);
+          continue;
+        }
 
         let agentResponse = "";
 
-        for await (const chunk of stream) {
+        for await (const chunk of agentStream) {
           const delta = chunk.choices[0]?.delta?.content || "";
           if (delta) {
             agentResponse += delta;
