@@ -8,7 +8,7 @@ import remarkGfm from "remark-gfm";
 import {
   ArrowLeft, Copy, Check, AlertTriangle, ArrowUp, ArrowDown, Minus,
   ChevronDown, ChevronRight, Merge, ClipboardList, X,
-  CheckCircle2, FileText, Loader2, RefreshCw, Download
+  CheckCircle2, FileText, Loader2, RefreshCw, Download, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
