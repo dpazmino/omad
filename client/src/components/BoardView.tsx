@@ -55,7 +55,9 @@ async function apiGet<T>(url: string): Promise<T> {
 
 async function apiPost<T>(url: string, body: object): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
 }
 
 async function apiPatch<T>(url: string, body: object): Promise<T> {
@@ -99,9 +101,18 @@ export default function BoardView({ projectId }: BoardViewProps) {
     queryClient.invalidateQueries({ queryKey: ["sprints", projectId] });
   };
 
+  const [importMessage, setImportMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const importMutation = useMutation({
     mutationFn: () => apiPost(`/api/projects/${projectId}/import-epics`, {}),
-    onSuccess: invalidateAll,
+    onSuccess: (data: any) => {
+      invalidateAll();
+      setImportMessage({ type: "success", text: data.message || `Imported ${data.imported?.epics} epics and ${data.imported?.stories} stories` });
+      setTimeout(() => setImportMessage(null), 5000);
+    },
+    onError: (err: any) => {
+      setImportMessage({ type: "error", text: err.message || "Import failed" });
+      setTimeout(() => setImportMessage(null), 8000);
+    },
   });
 
   const toggleEpic = (id: number) => {
@@ -160,6 +171,11 @@ export default function BoardView({ projectId }: BoardViewProps) {
           >
             <Import size={14} /> {importMutation.isPending ? "Importing..." : "Import from CE"}
           </button>
+          {importMessage && (
+            <span className={cn("text-xs px-2 py-1 rounded", importMessage.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800")}>
+              {importMessage.text}
+            </span>
+          )}
           <button
             data-testid="button-new-sprint"
             onClick={() => setShowNewSprint(true)}

@@ -303,15 +303,42 @@ Review and validate an existing PRD for completeness, clarity, and feasibility.
   CE: `CREATE EPICS AND STORIES WORKFLOW:
 Break down a PRD into implementable epics and user stories.
 
-1. Review the PRD (ask user to share if not in context)
+1. Review the PRD (ask user to share if not in context). If the project already has documents saved (PRD, Architecture, UX), pull them from context automatically — do not ask the user to paste them.
 2. Identify major epics (large bodies of work)
-3. For each epic, create detailed user stories with:
-   - Story title and description
-   - Acceptance criteria
-   - Story points estimate
-   - Dependencies
+3. For each epic, create detailed user stories
 4. Organize stories by priority and suggest sprint allocation
-5. Identify technical stories and infrastructure needs`,
+5. Identify technical stories and infrastructure needs
+
+CRITICAL — You MUST use this EXACT markdown format so stories can be parsed and imported into the board:
+
+## E1 — Epic Title
+
+**Goal:** Brief description of the epic goal.
+
+### Story E1.1: Story Title
+**Description:** What this story accomplishes.
+**Acceptance Criteria:**
+- Given X, when Y, then Z
+- Given A, when B, then C
+**Priority:** high
+**Story Points:** 3
+
+### Story E1.2: Next Story Title
+**Description:** ...
+**Acceptance Criteria:**
+- ...
+**Priority:** medium
+**Story Points:** 5
+
+## E2 — Next Epic Title
+...
+
+Rules:
+- Epic headings MUST start with \`## E<number> —\` (two hashes, E-prefix, em-dash)
+- Story headings MUST start with \`### Story E<epic>.<story>:\` (three hashes, word "Story", numbered)
+- Each story MUST have Description, Acceptance Criteria, Priority (low/medium/high/critical), and Story Points
+- Do NOT use bold (**) headings for stories — use ### markdown headings
+- Start the document with a summary table of all epics`,
 
   CA: `CREATE ARCHITECTURE WORKFLOW:
 Guide the creation of a technical architecture document.

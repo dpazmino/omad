@@ -1247,6 +1247,22 @@ Write ONLY the synthesized prompt — no preamble, no explanation. Format in mar
     if (!epicDoc) return res.status(404).json({ error: "No epic/stories document found. Run CE command first." });
 
     const parsed = parseEpicsFromDocument(epicDoc.content);
+    if (parsed.length === 0) {
+      return res.status(400).json({ error: "Could not parse any epics from the document. Check the document format." });
+    }
+    const totalStories = parsed.reduce((n, e) => n + e.stories.length, 0);
+    if (totalStories === 0) {
+      return res.status(400).json({ error: `Parsed ${parsed.length} epics but 0 stories. The document may use an unrecognized story format.` });
+    }
+
+    const existingEpics = await storage.getEpicsByProject(projectId);
+    if (existingEpics.length > 0) {
+      const existingStories = await storage.getStoriesByProject(projectId);
+      for (const e of existingEpics) await storage.deleteEpic(e.id);
+      for (const s of existingStories) await storage.deleteStory(s.id);
+      console.log(`[import-epics] Cleared ${existingEpics.length} existing epics and ${existingStories.length} stories before re-import`);
+    }
+
     const created = { epics: 0, stories: 0 };
 
     for (const ep of parsed) {
@@ -1271,81 +1287,165 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
   let currentStory: { title: string; description: string; acceptanceCriteria: string; priority?: string; storyPoints?: number } | null = null;
   let collectingAC = false;
   let acLines: string[] = [];
+  let collectingDesc = false;
+  let descLines: string[] = [];
+
+  function flushStory() {
+    if (currentStory && currentEpic) {
+      if (collectingAC && acLines.length > 0) {
+        currentStory.acceptanceCriteria = acLines.join("\n");
+      }
+      if (collectingDesc && descLines.length > 0 && !currentStory.description) {
+        currentStory.description = descLines.join("\n");
+      }
+      currentEpic.stories.push(currentStory);
+    }
+    currentStory = null;
+    collectingAC = false;
+    collectingDesc = false;
+    acLines = [];
+    descLines = [];
+  }
+
+  function isEpicHeading(trimmed: string): RegExpMatchArray | null {
+    const m = trimmed.match(/^#{1,2}\s+(?:[^a-zA-Z]*\s*)?(?:epic\s*\d*[:\s]*|E\d+\s*[—–\-:]\s*)(.+)/i);
+    if (m && /overview|summary|structure/i.test(m[1])) return null;
+    return m;
+  }
+
+  function isStoryHeading(trimmed: string): string | null {
+    let m: RegExpMatchArray | null;
+    m = trimmed.match(/^#{2,4}\s+(?:[^a-zA-Z]*\s*)?(?:user\s+)?story\s*(?:E?\d+[\-.]?\d*)?[:\s—–\-]+(.+)/i);
+    if (m) return m[1].replace(/\*{1,2}/g, "").trim();
+
+    m = trimmed.match(/^#{2,4}\s+S\d+[\.\-]\d+\s*[:\s—–\-]+(.+)/i);
+    if (m) return m[1].replace(/\*{1,2}/g, "").trim();
+
+    m = trimmed.match(/^#{2,4}\s+S\d+[\.\-]\d+\s*[:\s—–\-]*(.+)/i);
+    if (m) return m[1].replace(/\*{1,2}/g, "").trim() || null;
+
+    m = trimmed.match(/^#{3,4}\s+\d+[\.\-]\d+\s*[:\s—–\-]+(.+)/i);
+    if (m) return m[1].replace(/\*{1,2}/g, "").trim();
+
+    m = trimmed.match(/^#{3,4}\s+(?:US|Task|Feature)\s*[\-#]?\d*[:\s—–\-]+(.+)/i);
+    if (m) return m[1].replace(/\*{1,2}/g, "").trim();
+
+    m = trimmed.match(/^\*\*(?:User\s+)?Story\s*(?:E?\d+[\.\-]?\d*)?[:\s—–\-]+(.+?)\*\*/i);
+    if (m) return m[1].replace(/\*{1,2}/g, "").trim();
+
+    m = trimmed.match(/^\*\*S\d+[\.\-]\d+[:\s—–\-]+(.+?)\*\*/i);
+    if (m) return m[1].replace(/\*{1,2}/g, "").trim();
+
+    return null;
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    const epicMatch = trimmed.match(/^#{1,2}\s+(?:[^a-zA-Z]*\s*)?(?:epic\s*\d*[:\s]*|E\d+\s*[—–\-:]\s*)(.+)/i);
-    if (epicMatch && /overview|summary/i.test(epicMatch[1])) continue;
+    const epicMatch = isEpicHeading(trimmed);
     if (epicMatch) {
-      if (currentStory && currentEpic) {
-        if (collectingAC) currentStory.acceptanceCriteria = acLines.join("\n");
-        currentEpic.stories.push(currentStory);
-        currentStory = null;
-      }
+      flushStory();
       if (currentEpic) result.push(currentEpic);
       currentEpic = { title: epicMatch[1].replace(/\*{1,2}/g, "").trim(), description: "", stories: [] };
-      collectingAC = false;
-      acLines = [];
       continue;
     }
 
-    const storyMatch = trimmed.match(/^#{2,4}\s+(?:[^a-zA-Z]*\s*)?(?:user\s+)?story\s*(?:E?\d+[\-.]?\d*)?[:\s]*(.+)/i);
-    if (storyMatch && currentEpic) {
-      if (currentStory) {
-        if (collectingAC) currentStory.acceptanceCriteria = acLines.join("\n");
-        currentEpic.stories.push(currentStory);
+    if (currentEpic) {
+      const storyTitle = isStoryHeading(trimmed);
+      if (storyTitle) {
+        flushStory();
+        currentStory = { title: storyTitle, description: "", acceptanceCriteria: "" };
+        collectingDesc = false;
+        continue;
       }
-      currentStory = { title: storyMatch[1].replace(/\*{1,2}/g, "").trim(), description: "", acceptanceCriteria: "" };
-      collectingAC = false;
-      acLines = [];
-      continue;
     }
 
     if (trimmed.match(/^(?:\*{0,2})acceptance\s+criteria/i)) {
+      if (currentStory && collectingDesc && descLines.length > 0) {
+        currentStory.description = descLines.join("\n");
+        descLines = [];
+        collectingDesc = false;
+      }
       collectingAC = true;
       acLines = [];
+      continue;
+    }
+
+    if (trimmed.match(/^(?:\*{0,2})description\s*[:\s]/i) && currentStory) {
+      if (collectingAC && acLines.length > 0) {
+        currentStory.acceptanceCriteria = acLines.join("\n");
+        collectingAC = false;
+        acLines = [];
+      }
+      const descVal = trimmed.replace(/^\*{0,2}description\s*[:\s]\s*\*{0,2}/i, "").trim();
+      if (descVal) currentStory.description = descVal;
+      collectingDesc = true;
+      descLines = [];
       continue;
     }
 
     if (trimmed.match(/^(?:\*{0,2})(?:story\s+)?points?\s*[:\s]*(\d+)/i) && currentStory) {
       const pts = trimmed.match(/(\d+)/);
       if (pts) currentStory.storyPoints = parseInt(pts[1]);
+      if (collectingAC && acLines.length > 0) {
+        currentStory.acceptanceCriteria = acLines.join("\n");
+        collectingAC = false;
+      }
+      collectingDesc = false;
       continue;
     }
 
     if (trimmed.match(/^(?:\*{0,2})priority\s*[:\s]*(low|medium|high|critical)/i) && currentStory) {
       const p = trimmed.match(/(low|medium|high|critical)/i);
       if (p) currentStory.priority = p[1].toLowerCase();
+      if (collectingAC && acLines.length > 0) {
+        currentStory.acceptanceCriteria = acLines.join("\n");
+        collectingAC = false;
+      }
+      collectingDesc = false;
       continue;
     }
+
+    if (trimmed.match(/^(?:\*{0,2})(?:estimate|size|effort)\s*[:\s]*(\d+)/i) && currentStory) {
+      const pts = trimmed.match(/(\d+)/);
+      if (pts) currentStory.storyPoints = parseInt(pts[1]);
+      continue;
+    }
+
+    if (trimmed.startsWith("|") || trimmed.match(/^\|?[\s-]+\|/)) continue;
 
     if (collectingAC && currentStory) {
       if (trimmed.startsWith("#") || (trimmed === "" && acLines.length > 0 && lines[i + 1]?.trim().startsWith("#"))) {
         currentStory.acceptanceCriteria = acLines.join("\n");
         collectingAC = false;
-      } else if (trimmed.startsWith("|") || trimmed.match(/^\|?[\s-]+\|/)) {
-        continue;
-      } else {
+      } else if (trimmed) {
         acLines.push(trimmed);
       }
-    } else if (currentStory && !collectingAC && trimmed && !trimmed.startsWith("#")) {
-      if (trimmed.startsWith("|") || trimmed.match(/^\|?[\s-]+\|/)) continue;
+    } else if (collectingDesc && currentStory) {
+      if (trimmed.startsWith("#") || trimmed.match(/^(?:\*{0,2})(?:acceptance|priority|points?|story\s+points?)/i)) {
+        currentStory.description = descLines.join("\n");
+        collectingDesc = false;
+        i--;
+      } else if (trimmed) {
+        descLines.push(trimmed);
+      }
+    } else if (currentStory && !collectingAC && !collectingDesc && trimmed && !trimmed.startsWith("#")) {
       if (currentStory.description) currentStory.description += "\n" + trimmed;
       else currentStory.description = trimmed;
     } else if (currentEpic && !currentStory && trimmed && !trimmed.startsWith("#")) {
-      if (trimmed.startsWith("|") || trimmed.match(/^\|?[\s-]+\|/)) continue;
       if (currentEpic.description) currentEpic.description += "\n" + trimmed;
       else currentEpic.description = trimmed;
     }
   }
 
-  if (currentStory && currentEpic) {
-    if (collectingAC) currentStory.acceptanceCriteria = acLines.join("\n");
-    currentEpic.stories.push(currentStory);
-  }
+  flushStory();
   if (currentEpic) result.push(currentEpic);
+
+  console.log(`[parseEpics] Parsed ${result.length} epics with ${result.reduce((n, e) => n + e.stories.length, 0)} total stories`);
+  for (const ep of result) {
+    console.log(`  Epic: "${ep.title}" — ${ep.stories.length} stories`);
+  }
 
   return result;
 }
