@@ -27,6 +27,7 @@ const COMMAND_AGENT_MAP: Record<string, string> = {
   SP: "Bob", CS: "Bob", CC: "Bob",
   DS: "DevAI", CR: "DevAI",
   QA: "Quinn",
+  IN: "Allie",
 };
 
 const BMAD_PHASES = [
@@ -64,8 +65,17 @@ const BMAD_PHASES = [
     ]
   },
   {
+    id: "refinement",
+    title: "4. Refinement",
+    description: "Validate stories with the INVEST framework.",
+    agents: ["Allie (Story Analyst)"],
+    commands: [
+      { trigger: "IN", name: "INVEST Analysis" },
+    ]
+  },
+  {
     id: "implementation",
-    title: "4. Implementation",
+    title: "5. Implementation",
     description: "Sprint planning, development, code review, and QA.",
     agents: ["Bob (Scrum Master)", "DevAI (Developer)", "Quinn (QA Engineer)"],
     commands: [

@@ -371,7 +371,8 @@ export async function registerRoutes(
         { name: "1. Analysis", description: "Research, brainstorm, and define your product brief", agents: ["Business Analyst"] },
         { name: "2. Planning", description: "Create PRD, UX design, and stakeholder alignment", agents: ["Product Manager", "UX Designer"] },
         { name: "3. Solutioning", description: "Architecture, epics & stories, implementation readiness", agents: ["Lead Architect", "Product Manager"] },
-        { name: "4. Implementation", description: "Sprint planning, development, code review, QA", agents: ["Scrum Master", "Developer", "QA Engineer"] },
+        { name: "4. Refinement", description: "INVEST framework analysis to validate story quality", agents: ["Story Analyst"] },
+        { name: "5. Implementation", description: "Sprint planning, development, code review, QA", agents: ["Scrum Master", "Developer", "QA Engineer"] },
       ],
       agents: agents.map(a => ({
         name: a.name,
@@ -589,6 +590,138 @@ export async function registerRoutes(
   app.delete("/api/stories/:id", async (req, res) => {
     await storage.deleteStory(parseInt(req.params.id));
     res.status(204).end();
+  });
+
+  // ── INVEST Analysis for a story (Allie) ──
+  app.post("/api/stories/:id/invest", async (req, res) => {
+    const storyId = parseInt(req.params.id);
+    const story = await storage.getStory(storyId);
+    if (!story) return res.status(404).json({ error: "Story not found" });
+
+    const epic = await storage.getEpic(story.epicId);
+    const allStories = await storage.getStoriesByProject(story.projectId);
+    const siblingStories = allStories
+      .filter(s => s.epicId === story.epicId && s.id !== story.id && !s.mergedIntoStoryId)
+      .map(s => `  - [ID:${s.id}] "${s.title}"`)
+      .join("\n");
+
+    const systemPrompt = `You are Allie, the Story Analyst specializing in the INVEST framework (Bill Wake).
+
+Evaluate this user story against all six INVEST criteria. Return your analysis as a JSON object (and ONLY a JSON object, no other text) in this exact format:
+
+{
+  "independent": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "negotiable": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "valuable": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "estimable": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "small": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "testable": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "summary": "One paragraph overall assessment",
+  "suggestions": ["Specific improvement 1", "Specific improvement 2"]
+}
+
+INVEST criteria:
+- **Independent**: Can be developed without depending on other stories. Check for hidden coupling.
+- **Negotiable**: Flexible on implementation details. Not over-specified.
+- **Valuable**: Delivers clear user/business value. "So that" benefit is explicit.
+- **Estimable**: Enough information to estimate. No major unknowns.
+- **Small**: Completable in one sprint. Should be split if too large.
+- **Testable**: Clear acceptance criteria that can be verified.
+
+Score meanings:
+- "pass": Fully meets the criterion
+- "warn": Partially meets, minor improvements needed
+- "fail": Does not meet, significant rework needed`;
+
+    const userMessage = `Evaluate this story:
+
+**Title:** ${story.title}
+**Epic:** ${epic?.title || "Unknown"}
+**Description:** ${story.description || "(none)"}
+**Acceptance Criteria:** ${story.acceptanceCriteria || "(none)"}
+**Priority:** ${story.priority}
+**Story Points:** ${story.storyPoints || "Not estimated"}
+${story.dependsOn && story.dependsOn.length > 0 ? `**Dependencies:** ${story.dependsOn.join(", ")}` : ""}
+
+**Other stories in the same epic:**
+${siblingStories || "(none)"}`;
+
+    try {
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+      });
+
+      const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return res.status(500).json({ error: "Failed to parse INVEST analysis" });
+      }
+
+      const analysis = JSON.parse(jsonMatch[0]);
+      await storage.updateStory(storyId, { investAnalysis: analysis });
+      res.json({ analysis });
+    } catch (error: any) {
+      console.error("INVEST analysis error:", error);
+      res.status(500).json({ error: error.message || "INVEST analysis failed" });
+    }
+  });
+
+  // ── Bulk INVEST Analysis for all stories in project ──
+  app.post("/api/projects/:id/invest-all", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const allStories = await storage.getStoriesByProject(projectId);
+    const active = allStories.filter(s => !s.mergedIntoStoryId);
+    const epics = await storage.getEpicsByProject(projectId);
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    let completed = 0;
+    for (const story of active) {
+      try {
+        const epic = epics.find(e => e.id === story.epicId);
+        const siblings = active
+          .filter(s => s.epicId === story.epicId && s.id !== story.id)
+          .map(s => `  - [ID:${s.id}] "${s.title}"`)
+          .join("\n");
+
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-6",
+          max_tokens: 2048,
+          temperature: 0.1,
+          system: `You are Allie, the Story Analyst. Evaluate this story against INVEST. Return ONLY a JSON object with: independent, negotiable, valuable, estimable, small, testable (each with score "pass"|"warn"|"fail" and notes string), summary string, suggestions string array.`,
+          messages: [{
+            role: "user",
+            content: `Story: "${story.title}"\nEpic: ${epic?.title || "?"}\nDescription: ${story.description || "(none)"}\nAC: ${story.acceptanceCriteria || "(none)"}\nPoints: ${story.storyPoints || "?"}\nSiblings:\n${siblings || "(none)"}`
+          }],
+        });
+
+        const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          res.write(`data: ${JSON.stringify({ type: "error", storyId: story.id, storyTitle: story.title, error: "Failed to parse INVEST response" })}\n\n`);
+          continue;
+        }
+        try {
+          const analysis = JSON.parse(jsonMatch[0]);
+          await storage.updateStory(story.id, { investAnalysis: analysis });
+          completed++;
+          res.write(`data: ${JSON.stringify({ type: "progress", storyId: story.id, storyTitle: story.title, completed, total: active.length, analysis })}\n\n`);
+        } catch (parseErr: any) {
+          res.write(`data: ${JSON.stringify({ type: "error", storyId: story.id, storyTitle: story.title, error: "Invalid JSON in INVEST response" })}\n\n`);
+        }
+      } catch (err: any) {
+        res.write(`data: ${JSON.stringify({ type: "error", storyId: story.id, storyTitle: story.title, error: err.message })}\n\n`);
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ type: "done", completed, total: active.length })}\n\n`);
+    res.end();
   });
 
   // ── Fred (Senior Scrum Master) chat — sprint planning with dependency analysis ──

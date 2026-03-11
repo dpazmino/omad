@@ -12,7 +12,7 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
 
 ## Key Features
 - **Projects**: Central organizing concept — each project has its own sessions, workflows, and phase tracking
-- **8 BMad Agents**: Winston (Architect), John (PM), Mary (Analyst), Sally (UX), Bob (Scrum Master), DevAI (Developer), Quinn (QA), Fred (Senior Scrum Master — sprint planning, dependency analysis)
+- **9 BMad Agents**: Winston (Architect), John (PM), Mary (Analyst), Sally (UX), Bob (Scrum Master), DevAI (Developer), Quinn (QA), Fred (Senior Scrum Master — sprint planning, dependency analysis), Allie (Story Analyst — INVEST framework analysis)
 - **Real-time Chat**: Streaming SSE responses from Claude with agent personas (project-scoped)
 - **Interactive Responses**: Agent responses with questions/choices are parsed into interactive UI (radio buttons for MC, text inputs for open-ended). Located in `client/src/components/InteractiveResponse.tsx`
 - **Party Mode**: All active agents collaborate and respond sequentially
@@ -22,8 +22,9 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
   - Documents stored in `documents` table with project/session/message references
   - Panel supports viewing full document content, deleting, and scanning existing conversations
 - **Command Prerequisites**: Commands check for required documents before executing (e.g., MR needs brainstorm, CP needs product-brief). Buttons show disabled with tooltip when prerequisites aren't met. When prerequisites are met, document content is automatically injected as context.
-- **Workflow Guide**: Visual reference for the 4-phase BMad development lifecycle per project
-- **Phase Tracking**: Projects track their current BMad phase (analysis → planning → solutioning → implementation)
+- **INVEST Analysis (Allie)**: Every story gets an INVEST (Independent, Negotiable, Valuable, Estimable, Small, Testable) analysis panel in the story detail modal. "Run INVEST" button calls Allie (Claude) to evaluate the story against all 6 criteria with pass/warn/fail scores and improvement suggestions. Results stored as `stories.investAnalysis` JSONB column. INVEST score badges (N/6) appear on story rows and kanban cards. Bulk analysis available via `/api/projects/:id/invest-all` (SSE). Phase 4 "Refinement" with IN command added between Solutioning and Implementation.
+- **Workflow Guide**: Visual reference for the 5-phase BMad development lifecycle per project
+- **Phase Tracking**: Projects track their current BMad phase (analysis → planning → solutioning → refinement → implementation)
 - **Board View (Jira-like)**: Project board with epics, sprints, and stories. Accessible via "Board" tab in ProjectDetail. Features:
   - Epic list view with collapsible epics and story rows
   - Kanban board with 5-column layout (Backlog, To Do, In Progress, Review, Done)
@@ -78,7 +79,7 @@ server/replit_integrations/  - AI integration modules (chat, audio, image, batch
 - `documents` - Auto-detected project artifacts (title, docType, content, agentName, phase, projectId, sessionId, messageId)
 - `epics` - Project epics (title, description, status, priority, projectId FK)
 - `sprints` - Project sprints (name, goal, status, startDate, endDate, projectId FK)
-- `stories` - User stories (title, description, acceptanceCriteria, status, priority, storyPoints, assignee, prompt, mergedIntoStoryId, dependsOn int[], epicId FK, sprintId FK nullable, projectId FK)
+- `stories` - User stories (title, description, acceptanceCriteria, status, priority, storyPoints, assignee, prompt, mergedIntoStoryId, dependsOn int[], investAnalysis JSONB, epicId FK, sprintId FK nullable, projectId FK)
 
 ## Data Model
 - Projects are the top-level entity

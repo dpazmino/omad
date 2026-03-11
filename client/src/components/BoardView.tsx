@@ -4,7 +4,8 @@ import type { Epic, Story, Sprint } from "@shared/schema";
 import {
   ChevronDown, ChevronRight, Plus, Trash2, Edit2, X, Check,
   Target, Zap, AlertTriangle, ArrowUp, ArrowDown, Minus,
-  LayoutGrid, List, Import, MessageSquare, Send, Link2, Save, Loader2
+  LayoutGrid, List, Import, MessageSquare, Send, Link2, Save, Loader2,
+  ShieldCheck, RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -330,6 +331,19 @@ function EpicListView({ epics, stories, sprints, expandedEpics, onToggleEpic, ep
   );
 }
 
+function InvestBadge({ analysis, storyId }: { analysis: { independent: { score: string }; negotiable: { score: string }; valuable: { score: string }; estimable: { score: string }; small: { score: string }; testable: { score: string } }; storyId: number }) {
+  const criteria = [analysis.independent, analysis.negotiable, analysis.valuable, analysis.estimable, analysis.small, analysis.testable];
+  const passes = criteria.filter(c => c?.score === "pass").length;
+  const fails = criteria.filter(c => c?.score === "fail").length;
+  const color = fails > 0 ? "text-red-600 bg-red-50 border-red-200" : passes === 6 ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-amber-600 bg-amber-50 border-amber-200";
+  return (
+    <span className={cn("flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded border", color)} data-testid={`invest-badge-${storyId}`}>
+      <ShieldCheck size={9} />
+      {passes}/6
+    </span>
+  );
+}
+
 function StoryRow({ story, sprints, onEdit, onInvalidate }: { story: Story; sprints: Sprint[]; onEdit: () => void; onInvalidate: () => void }) {
   const sprint = sprints.find(s => s.id === story.sprintId);
   const hasDeps = story.dependsOn && story.dependsOn.length > 0;
@@ -344,6 +358,9 @@ function StoryRow({ story, sprints, onEdit, onInvalidate }: { story: Story; spri
         {PRIORITY_ICONS[story.priority]}
       </div>
       <span className="flex-1 text-sm text-foreground truncate">{story.title}</span>
+      {story.investAnalysis && (
+        <InvestBadge analysis={story.investAnalysis as any} storyId={story.id} />
+      )}
       {hasDeps && (
         <span className="flex items-center gap-0.5 text-[10px] font-medium text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded" data-testid={`deps-badge-${story.id}`}>
           <Link2 size={9} />
@@ -497,6 +514,9 @@ function KanbanBoard({ stories, epics, sprints, selectedSprint, onSelectSprint, 
                         <p className="text-xs text-muted-foreground mt-1 truncate">{epic.title}</p>
                       )}
                       <div className="flex items-center gap-2 mt-2">
+                        {story.investAnalysis && (
+                          <InvestBadge analysis={story.investAnalysis as any} storyId={story.id} />
+                        )}
                         {story.dependsOn && story.dependsOn.length > 0 && (
                           <span className="flex items-center gap-0.5 text-[10px] font-medium text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded">
                             <Link2 size={9} />
@@ -522,10 +542,33 @@ function KanbanBoard({ stories, epics, sprints, selectedSprint, onSelectSprint, 
   );
 }
 
+const INVEST_LABELS: Record<string, { letter: string; name: string }> = {
+  independent: { letter: "I", name: "Independent" },
+  negotiable: { letter: "N", name: "Negotiable" },
+  valuable: { letter: "V", name: "Valuable" },
+  estimable: { letter: "E", name: "Estimable" },
+  small: { letter: "S", name: "Small" },
+  testable: { letter: "T", name: "Testable" },
+};
+
+const INVEST_SCORE_STYLES: Record<string, string> = {
+  pass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  warn: "bg-amber-50 text-amber-700 border-amber-200",
+  fail: "bg-red-50 text-red-700 border-red-200",
+};
+
+const INVEST_SCORE_LABELS: Record<string, string> = {
+  pass: "Pass",
+  warn: "Warn",
+  fail: "Fail",
+};
+
 function StoryDetailModal({ story, epics, sprints, stories, onClose, onSave }: {
   story: Story; epics: Epic[]; sprints: Sprint[]; stories: Story[]; onClose: () => void; onSave: () => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [investLoading, setInvestLoading] = useState(false);
+  const [investData, setInvestData] = useState(story.investAnalysis || null);
   const [form, setForm] = useState({
     title: story.title,
     description: story.description,
@@ -724,6 +767,87 @@ function StoryDetailModal({ story, epics, sprints, stories, onClose, onSave }: {
               </div>
             </div>
           )}
+
+          <div data-testid="story-invest-section">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-muted-foreground">
+                <span className="flex items-center gap-1"><ShieldCheck size={11} /> INVEST Analysis</span>
+              </label>
+              <button
+                data-testid="button-run-invest"
+                disabled={investLoading}
+                onClick={async () => {
+                  setInvestLoading(true);
+                  try {
+                    const res = await fetch(`/api/stories/${story.id}/invest`, { method: "POST", headers: { "Content-Type": "application/json" } });
+                    if (!res.ok) throw new Error("Analysis failed");
+                    const data = await res.json();
+                    setInvestData(data.analysis);
+                  } catch (e) {
+                    console.error("INVEST error:", e);
+                  } finally {
+                    setInvestLoading(false);
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors",
+                  investLoading
+                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                    : "bg-pink-700 text-white hover:bg-pink-800"
+                )}
+              >
+                {investLoading ? (
+                  <><Loader2 size={11} className="animate-spin" /> Analyzing...</>
+                ) : (
+                  <><RefreshCw size={11} /> {investData ? "Re-run INVEST" : "Run INVEST (IN)"}</>
+                )}
+              </button>
+            </div>
+
+            {investData ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(Object.keys(INVEST_LABELS) as string[]).map(key => {
+                    const criterion = (investData as any)[key];
+                    if (!criterion) return null;
+                    const label = INVEST_LABELS[key];
+                    const scoreStyle = INVEST_SCORE_STYLES[criterion.score] || INVEST_SCORE_STYLES.warn;
+                    return (
+                      <div key={key} className={cn("px-2.5 py-2 rounded border text-xs", scoreStyle)} data-testid={`invest-${key}`}>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="font-semibold">{label.letter} - {label.name}</span>
+                          <span className="text-[10px] font-bold uppercase">{INVEST_SCORE_LABELS[criterion.score] || criterion.score}</span>
+                        </div>
+                        <p className="text-[11px] leading-snug opacity-80">{criterion.notes}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {(investData as any).summary && (
+                  <div className="px-3 py-2 rounded border border-border bg-muted/30 text-xs" data-testid="invest-summary">
+                    <span className="font-medium text-muted-foreground">Summary: </span>
+                    {(investData as any).summary}
+                  </div>
+                )}
+
+                {(investData as any).suggestions && (investData as any).suggestions.length > 0 && (
+                  <div className="px-3 py-2 rounded border border-blue-100 bg-blue-50/50 text-xs" data-testid="invest-suggestions">
+                    <span className="font-medium text-blue-700 block mb-1">Suggestions:</span>
+                    <ul className="list-disc list-inside space-y-0.5 text-blue-800">
+                      {(investData as any).suggestions.map((s: string, i: number) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="px-3 py-4 rounded border border-dashed border-border bg-muted/20 text-xs text-muted-foreground text-center">
+                No INVEST analysis yet. Click "Run INVEST" to evaluate this story.
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 p-4 border-t border-border">

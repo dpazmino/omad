@@ -115,6 +115,16 @@ export const stories = pgTable("stories", {
   prompt: text("prompt"),
   mergedIntoStoryId: integer("merged_into_story_id"),
   dependsOn: integer("depends_on").array().default([]),
+  investAnalysis: jsonb("invest_analysis").$type<{
+    independent: { score: string; notes: string };
+    negotiable: { score: string; notes: string };
+    valuable: { score: string; notes: string };
+    estimable: { score: string; notes: string };
+    small: { score: string; notes: string };
+    testable: { score: string; notes: string };
+    summary: string;
+    suggestions: string[];
+  }>(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
