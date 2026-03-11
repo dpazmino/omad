@@ -1342,6 +1342,7 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
+    const stripped = trimmed.replace(/\*{1,2}/g, "").trim();
 
     const epicMatch = isEpicHeading(trimmed);
     if (epicMatch) {
@@ -1361,7 +1362,7 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
       }
     }
 
-    if (trimmed.match(/^(?:\*{0,2})acceptance\s+criteria/i)) {
+    if (stripped.match(/^acceptance\s+criteria/i)) {
       if (currentStory && collectingDesc && descLines.length > 0) {
         currentStory.description = descLines.join("\n");
         descLines = [];
@@ -1372,21 +1373,21 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
       continue;
     }
 
-    if (trimmed.match(/^(?:\*{0,2})description\s*[:\s]/i) && currentStory) {
+    if (stripped.match(/^description\s*[:\s]/i) && currentStory) {
       if (collectingAC && acLines.length > 0) {
         currentStory.acceptanceCriteria = acLines.join("\n");
         collectingAC = false;
         acLines = [];
       }
-      const descVal = trimmed.replace(/^\*{0,2}description\s*[:\s]\s*\*{0,2}/i, "").trim();
+      const descVal = stripped.replace(/^description\s*[:\s]\s*/i, "").trim();
       if (descVal) currentStory.description = descVal;
       collectingDesc = true;
       descLines = [];
       continue;
     }
 
-    if (trimmed.match(/^(?:\*{0,2})(?:story\s+)?points?\s*[:\s]*(\d+)/i) && currentStory) {
-      const pts = trimmed.match(/(\d+)/);
+    if (stripped.match(/^(?:story\s+)?points?\s*[:\s]*\d+/i) && currentStory) {
+      const pts = stripped.match(/(\d+)/);
       if (pts) currentStory.storyPoints = parseInt(pts[1]);
       if (collectingAC && acLines.length > 0) {
         currentStory.acceptanceCriteria = acLines.join("\n");
@@ -1396,8 +1397,8 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
       continue;
     }
 
-    if (trimmed.match(/^(?:\*{0,2})priority\s*[:\s]*(low|medium|high|critical)/i) && currentStory) {
-      const p = trimmed.match(/(low|medium|high|critical)/i);
+    if (stripped.match(/^priority\s*[:\s]*(low|medium|high|critical)/i) && currentStory) {
+      const p = stripped.match(/(low|medium|high|critical)/i);
       if (p) currentStory.priority = p[1].toLowerCase();
       if (collectingAC && acLines.length > 0) {
         currentStory.acceptanceCriteria = acLines.join("\n");
@@ -1407,9 +1408,13 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
       continue;
     }
 
-    if (trimmed.match(/^(?:\*{0,2})(?:estimate|size|effort)\s*[:\s]*(\d+)/i) && currentStory) {
-      const pts = trimmed.match(/(\d+)/);
+    if (stripped.match(/^(?:estimate|size|effort)\s*[:\s]*\d+/i) && currentStory) {
+      const pts = stripped.match(/(\d+)/);
       if (pts) currentStory.storyPoints = parseInt(pts[1]);
+      continue;
+    }
+
+    if (stripped.match(/^(?:dependencies|depends\s+on|blocked\s+by)\s*[:\s]/i)) {
       continue;
     }
 
@@ -1431,6 +1436,7 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
         descLines.push(trimmed);
       }
     } else if (currentStory && !collectingAC && !collectingDesc && trimmed && !trimmed.startsWith("#")) {
+      if (stripped.match(/^(?:story\s+)?points?\s*:/i) || stripped.match(/^priority\s*:/i) || stripped.match(/^(?:dependencies|depends\s+on|blocked\s+by)\s*:/i) || stripped.match(/^(?:estimate|size|effort)\s*:/i)) continue;
       if (currentStory.description) currentStory.description += "\n" + trimmed;
       else currentStory.description = trimmed;
     } else if (currentEpic && !currentStory && trimmed && !trimmed.startsWith("#")) {
