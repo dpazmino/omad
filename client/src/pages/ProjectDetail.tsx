@@ -1043,26 +1043,53 @@ function DocumentsPanel({
         </div>
       </div>
 
-      {viewingDoc ? (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="p-3 border-b border-border flex items-center gap-2">
-            <button
-              data-testid="button-back-to-docs"
-              onClick={() => onViewDoc(null)}
-              className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft size={14} />
-            </button>
-            <span className="text-xs font-medium truncate flex-1">{viewingDoc.title}</span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="prose prose-sm max-w-none">
-              <ReactMarkdown>{viewingDoc.content}</ReactMarkdown>
+      {viewingDoc && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-6" onClick={() => onViewDoc(null)}>
+          <div
+            className="bg-card rounded-lg shadow-xl border border-border w-full max-w-4xl max-h-[90vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className={cn(
+                  "text-[10px] font-semibold w-7 h-7 rounded bg-muted border border-border flex items-center justify-center shrink-0",
+                  (DOC_TYPE_ICONS[viewingDoc.docType] || DOC_TYPE_ICONS["general"]).color
+                )}>
+                  {(DOC_TYPE_ICONS[viewingDoc.docType] || DOC_TYPE_ICONS["general"]).icon}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-foreground truncate" data-testid="text-doc-modal-title">{viewingDoc.title}</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted", (DOC_TYPE_ICONS[viewingDoc.docType] || DOC_TYPE_ICONS["general"]).color)}>
+                      {viewingDoc.docType.replace("-", " ")}
+                    </span>
+                    {viewingDoc.agentName && (
+                      <span className="text-[10px] text-muted-foreground">by {viewingDoc.agentName}</span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground/60">
+                      {new Date(viewingDoc.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                data-testid="button-close-doc-modal"
+                onClick={() => onViewDoc(null)}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown>{viewingDoc.content}</ReactMarkdown>
+              </div>
             </div>
           </div>
         </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-1">
+      )}
+
+      <div className="flex-1 overflow-y-auto py-2 px-2 space-y-1">
           {documents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4 py-8">
               <div className="w-10 h-10 rounded bg-muted border border-border flex items-center justify-center mb-3">
@@ -1123,8 +1150,7 @@ function DocumentsPanel({
               );
             })
           )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
