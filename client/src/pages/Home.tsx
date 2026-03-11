@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { fetchAgents, fetchMessages, fetchSessions, createSession, streamChat, type StreamEvent } from "@/lib/api";
 import type { Agent, ChatMessage, Session } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function Home() {
   const queryClient = useQueryClient();
@@ -233,7 +234,7 @@ export default function Home() {
                   </span>
                   <div className="bg-card px-4 py-3 rounded border border-border max-w-[85%]">
                     <div className="prose prose-sm max-w-none">
-                      <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
                     </div>
                   </div>
                 </div>
@@ -251,7 +252,7 @@ export default function Home() {
                   <span className="text-[10px] text-muted-foreground font-medium ml-0.5">{pr.agentName}</span>
                   <div className="bg-card px-4 py-3 rounded border border-border max-w-[85%]">
                     <div className="prose prose-sm max-w-none">
-                      <ReactMarkdown>{pr.content}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{pr.content}</ReactMarkdown>
                     </div>
                     {!pr.done && (
                       <div className="flex items-center gap-1.5 mt-2">
@@ -371,7 +372,7 @@ function MessageBubble({ message, agents }: { message: ChatMessage; agents: Agen
               message.content
             ) : (
               <div className="prose prose-sm max-w-none">
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
               </div>
             )}
           </div>

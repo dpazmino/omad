@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout/Layout";
 import type { Story, Epic, Sprint } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   ArrowLeft, Copy, Check, AlertTriangle, ArrowUp, ArrowDown, Minus,
   ChevronDown, ChevronRight, Merge, ClipboardList, X,
@@ -326,7 +327,7 @@ export default function DevView() {
                 </div>
                 <div ref={aggregateScrollRef} className="flex-1 overflow-auto p-4">
                   <div className="prose prose-sm max-w-none">
-                    <ReactMarkdown>{aggregating ? aggregateStreaming : (aggregatedPrompt || "")}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{aggregating ? aggregateStreaming : (aggregatedPrompt || "")}</ReactMarkdown>
                   </div>
                   {aggregating && <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse ml-0.5" />}
                 </div>
@@ -482,7 +483,7 @@ function StoryPromptPanel({ story, epic, onPromptGenerated, onCopy, copied }: {
             <div className="text-sm">
               <p className="text-xs font-medium text-muted-foreground mb-1">Acceptance Criteria:</p>
               <div className="prose prose-sm max-w-none pl-2 border-l-2 border-border">
-                <ReactMarkdown>{story.acceptanceCriteria}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{story.acceptanceCriteria}</ReactMarkdown>
               </div>
             </div>
           )}
@@ -493,7 +494,7 @@ function StoryPromptPanel({ story, epic, onPromptGenerated, onCopy, copied }: {
         {hasPrompt ? (
           <div ref={scrollRef} className="flex-1 overflow-auto p-4">
             <div className="prose prose-sm max-w-none">
-              <ReactMarkdown>{displayText}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayText}</ReactMarkdown>
             </div>
             {generating && (
               <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse ml-0.5" />

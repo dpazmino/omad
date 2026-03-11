@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const STORY_STATUSES = ["backlog", "todo", "in-progress", "review", "done"] as const;
 const PRIORITIES = ["low", "medium", "high", "critical"] as const;
@@ -723,7 +724,7 @@ function StoryDetailModal({ story, epics, sprints, stories, onClose, onSave }: {
               />
             ) : (
               <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm prose prose-sm max-w-none">
-                <ReactMarkdown>{storyData.description || "No description"}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{storyData.description || "No description"}</ReactMarkdown>
               </div>
             )}
           </div>
@@ -740,7 +741,7 @@ function StoryDetailModal({ story, epics, sprints, stories, onClose, onSave }: {
               />
             ) : (
               <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm prose prose-sm max-w-none">
-                <ReactMarkdown>{storyData.acceptanceCriteria || "No acceptance criteria"}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{storyData.acceptanceCriteria || "No acceptance criteria"}</ReactMarkdown>
               </div>
             )}
           </div>
@@ -1255,7 +1256,7 @@ function FredChatPanel({ projectId, stories, onClose, onDependenciesSaved }: {
                   : "bg-muted border border-border text-foreground"
               )}>
                 <div className="prose prose-xs max-w-none [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5 [&_h1]:text-sm [&_h2]:text-xs [&_h3]:text-xs [&_table]:text-[10px]">
-                  <ReactMarkdown>{displayContent}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
                 </div>
                 {deps && deps.length > 0 && !alreadySaved && (
                   <button
@@ -1283,7 +1284,7 @@ function FredChatPanel({ projectId, stories, onClose, onDependenciesSaved }: {
             <div className="w-6 h-6 rounded bg-primary/10 border border-primary/20 flex items-center justify-center text-[9px] font-bold text-primary shrink-0 mt-0.5">FR</div>
             <div className="max-w-[85%] rounded px-3 py-2 text-xs bg-muted border border-border text-foreground">
               <div className="prose prose-xs max-w-none [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5">
-                <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
               </div>
             </div>
           </div>

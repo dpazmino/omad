@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ParsedQuestion {
   id: number;
@@ -343,7 +344,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
   if (!parsed) {
     return (
       <div className="prose prose-sm max-w-none">
-        <ReactMarkdown>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </div>
     );
   }
@@ -352,7 +353,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
     <div className="space-y-4">
       {parsed.preamble && (
         <div className="prose prose-sm max-w-none">
-          <ReactMarkdown>{parsed.preamble}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.preamble}</ReactMarkdown>
         </div>
       )}
 
@@ -386,7 +387,7 @@ export function InteractiveResponse({ content, onSubmitAnswers, isLastMessage, d
 
       {parsed.closing && (
         <div className="prose prose-sm max-w-none mt-3">
-          <ReactMarkdown>{parsed.closing}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.closing}</ReactMarkdown>
         </div>
       )}
     </div>

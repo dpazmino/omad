@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import type { Agent, ChatMessage, Session, Project, Document } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { InteractiveResponse } from "@/components/InteractiveResponse";
 import BoardView from "@/components/BoardView";
 
@@ -709,7 +710,7 @@ function ChatView({
                   </span>
                   <div className="bg-card px-4 py-3 rounded border border-border max-w-[85%]">
                     <div className="prose prose-sm max-w-none">
-                      <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
                     </div>
                   </div>
                 </div>
@@ -727,7 +728,7 @@ function ChatView({
                   <span className="text-[10px] text-muted-foreground font-medium ml-0.5">{pr.agentName}</span>
                   <div className="bg-card px-4 py-3 rounded border border-border max-w-[85%]">
                     <div className="prose prose-sm max-w-none">
-                      <ReactMarkdown>{pr.content}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{pr.content}</ReactMarkdown>
                     </div>
                     {!pr.done && (
                       <div className="flex items-center gap-1.5 mt-2">
@@ -1082,7 +1083,7 @@ function DocumentsPanel({
             </div>
             <div className="flex-1 overflow-y-auto p-6">
               <div className="prose prose-sm max-w-none">
-                <ReactMarkdown>{viewingDoc.content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewingDoc.content}</ReactMarkdown>
               </div>
             </div>
           </div>
