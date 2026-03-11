@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import {
   ArrowLeft, Copy, Check, AlertTriangle, ArrowUp, ArrowDown, Minus,
   ChevronDown, ChevronRight, Merge, ClipboardList, Sparkles, X,
-  CheckCircle2, FileText, Loader2, RefreshCw
+  CheckCircle2, FileText, Loader2, RefreshCw, Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -81,17 +81,75 @@ export default function DevView() {
   const inProgressStories = stories.filter(s => s.status === "in-progress" && !s.mergedIntoStoryId);
   const storiesWithPrompts = inProgressStories.filter(s => s.prompt);
 
-  const aggregateMutation = useMutation({
-    mutationFn: () => {
+  const [aggregating, setAggregating] = useState(false);
+  const [aggregateStreaming, setAggregateStreaming] = useState("");
+  const aggregateScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (aggregateScrollRef.current) {
+      aggregateScrollRef.current.scrollTop = aggregateScrollRef.current.scrollHeight;
+    }
+  }, [aggregateStreaming]);
+
+  const handleAggregate = async () => {
+    setAggregating(true);
+    setAggregateStreaming("");
+    setAggregatedPrompt(null);
+
+    try {
       const ids = selectedStoryIds.size > 0 ? Array.from(selectedStoryIds) : undefined;
-      return apiPost<{ prompt: string }>(`/api/projects/${projectId}/aggregate-prompts`, { storyIds: ids });
-    },
-    onSuccess: (data) => {
-      setAggregatedPrompt(data.prompt);
-      toast({ title: "Prompts aggregated", description: `Combined prompts ready to copy` });
-    },
-    onError: (e: Error) => toast({ title: "Aggregation failed", description: e.message, variant: "destructive" }),
-  });
+      const res = await fetch(`/api/projects/${projectId}/aggregate-prompts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storyIds: ids }),
+      });
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === "text") {
+              fullText += data.text;
+              setAggregateStreaming(fullText);
+            } else if (data.type === "done") {
+              setAggregatedPrompt(data.prompt);
+              setAggregateStreaming("");
+              toast({ title: "Aggregate prompt ready", description: "Download or copy the synthesized prompt" });
+            } else if (data.type === "error") {
+              toast({ title: "Aggregation failed", description: data.error, variant: "destructive" });
+            }
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      toast({ title: "Aggregation failed", description: e.message, variant: "destructive" });
+    } finally {
+      setAggregating(false);
+    }
+  };
+
+  const handleDownload = (text: string, filename: string) => {
+    const blob = new Blob([text], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const mergeMutation = useMutation({
     mutationFn: (args: { primaryId: number; duplicateIds: number[] }) =>
@@ -152,11 +210,11 @@ export default function DevView() {
             </button>
             <button
               data-testid="button-aggregate-prompts"
-              onClick={() => aggregateMutation.mutate()}
-              disabled={aggregateMutation.isPending}
+              onClick={handleAggregate}
+              disabled={aggregating}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
             >
-              <Sparkles size={14} /> {aggregateMutation.isPending ? "Building..." : "Aggregate Prompts"}
+              {aggregating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {aggregating ? "Synthesizing..." : "Aggregate Prompts"}
             </button>
           </div>
         </header>
@@ -229,31 +287,48 @@ export default function DevView() {
                 onMerge={(primaryId, duplicateIds) => mergeMutation.mutate({ primaryId, duplicateIds })}
                 onClose={() => setShowDuplicates(false)}
               />
-            ) : aggregatedPrompt !== null ? (
+            ) : (aggregatedPrompt !== null || aggregating) ? (
               <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
-                  <h2 className="text-sm font-semibold text-foreground">Aggregated Prompt</h2>
+                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    {aggregating && <Loader2 size={14} className="animate-spin text-primary" />}
+                    {aggregating ? "Synthesizing Prompts..." : "Synthesized Prompt"}
+                  </h2>
                   <div className="flex items-center gap-2">
-                    <button
-                      data-testid="button-copy-aggregate"
-                      onClick={() => handleCopy(aggregatedPrompt)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
-                    >
-                      {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy to Clipboard</>}
-                    </button>
-                    <button
-                      data-testid="button-close-aggregate"
-                      onClick={() => setAggregatedPrompt(null)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <X size={18} />
-                    </button>
+                    {aggregatedPrompt && !aggregating && (
+                      <>
+                        <button
+                          data-testid="button-download-aggregate"
+                          onClick={() => handleDownload(aggregatedPrompt, "claude-code-prompt.md")}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                        >
+                          <Download size={14} /> Download Prompt
+                        </button>
+                        <button
+                          data-testid="button-copy-aggregate"
+                          onClick={() => handleCopy(aggregatedPrompt)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                        >
+                          {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy</>}
+                        </button>
+                      </>
+                    )}
+                    {!aggregating && (
+                      <button
+                        data-testid="button-close-aggregate"
+                        onClick={() => { setAggregatedPrompt(null); setAggregateStreaming(""); }}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X size={18} />
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="flex-1 overflow-auto p-4">
+                <div ref={aggregateScrollRef} className="flex-1 overflow-auto p-4">
                   <div className="prose prose-sm max-w-none">
-                    <ReactMarkdown>{aggregatedPrompt}</ReactMarkdown>
+                    <ReactMarkdown>{aggregating ? aggregateStreaming : (aggregatedPrompt || "")}</ReactMarkdown>
                   </div>
+                  {aggregating && <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse ml-0.5" />}
                 </div>
               </div>
             ) : selectedStory ? (

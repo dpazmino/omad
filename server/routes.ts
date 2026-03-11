@@ -655,7 +655,7 @@ Write ONLY the prompt — no preamble, no explanation, no meta-commentary.`;
     }
   });
 
-  // ── Aggregate prompts from in-progress stories ──
+  // ── Aggregate prompts via Claude ──
   app.post("/api/projects/:id/aggregate-prompts", async (req, res) => {
     const projectId = parseInt(req.params.id);
     const { storyIds } = req.body as { storyIds?: number[] };
@@ -663,24 +663,73 @@ Write ONLY the prompt — no preamble, no explanation, no meta-commentary.`;
     const targetStories = storyIds
       ? allStories.filter(s => storyIds.includes(s.id))
       : allStories.filter(s => s.status === "in-progress" && s.prompt && !s.mergedIntoStoryId);
-    if (targetStories.length === 0) return res.json({ prompt: "", stories: [] });
+
+    if (targetStories.length === 0) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.write(`data: ${JSON.stringify({ type: "error", error: "No stories with prompts found. Generate prompts for individual stories first." })}\n\n`);
+      return res.end();
+    }
 
     const epics = await storage.getEpicsByProject(projectId);
-    const parts: string[] = [];
-    parts.push("# Implementation Prompt — Aggregated Stories\n");
-    parts.push(`Total stories: ${targetStories.length}\n`);
+    const inputParts: string[] = [];
+    inputParts.push(`# Individual Story Prompts to Synthesize\n`);
+    inputParts.push(`There are ${targetStories.length} stories. Each has its own implementation prompt below.\n`);
 
     for (const story of targetStories) {
       const epic = epics.find(e => e.id === story.epicId);
-      parts.push(`---\n## Story: ${story.title}`);
-      if (epic) parts.push(`**Epic:** ${epic.title}`);
-      if (story.description) parts.push(`**Description:** ${story.description}`);
-      if (story.acceptanceCriteria) parts.push(`**Acceptance Criteria:**\n${story.acceptanceCriteria}`);
-      if (story.prompt) parts.push(`**Implementation Prompt:**\n${story.prompt}`);
-      parts.push("");
+      inputParts.push(`---\n## Story: ${story.title}`);
+      if (epic) inputParts.push(`**Epic:** ${epic.title}`);
+      if (story.description) inputParts.push(`**Description:** ${story.description}`);
+      if (story.acceptanceCriteria) inputParts.push(`**Acceptance Criteria:**\n${story.acceptanceCriteria}`);
+      if (story.prompt) inputParts.push(`**Individual Prompt:**\n${story.prompt}`);
+      inputParts.push("");
     }
 
-    res.json({ prompt: parts.join("\n"), stories: targetStories.map(s => ({ id: s.id, title: s.title })) });
+    const systemPrompt = `You are a senior software architect synthesizing multiple implementation prompts into a single, cohesive prompt for Claude Code (an AI coding agent).
+
+You are given individual implementation prompts for multiple related user stories. Your job is to:
+- Identify overlapping work, shared dependencies, and logical implementation order
+- Combine them into ONE clear, well-structured prompt that Claude Code can execute
+- Eliminate redundancy while preserving all requirements
+- Organize the work into a logical sequence (e.g., schema changes first, then API, then UI)
+- Include all acceptance criteria from all stories
+- Flag any potential conflicts between stories
+
+Write ONLY the synthesized prompt — no preamble, no explanation. Format in markdown.`;
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    try {
+      const stream = anthropic.messages.stream({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8192,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [{ role: "user", content: inputParts.join("\n\n") }],
+      });
+
+      let fullText = "";
+      stream.on("text", (text) => {
+        fullText += text;
+        res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+      });
+
+      stream.on("end", () => {
+        res.write(`data: ${JSON.stringify({ type: "done", prompt: fullText })}\n\n`);
+        res.end();
+      });
+
+      stream.on("error", (err) => {
+        res.write(`data: ${JSON.stringify({ type: "error", error: err.message })}\n\n`);
+        res.end();
+      });
+    } catch (err: any) {
+      res.write(`data: ${JSON.stringify({ type: "error", error: err.message })}\n\n`);
+      res.end();
+    }
   });
 
   // ── Detect duplicate stories ──
