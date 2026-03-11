@@ -8,7 +8,7 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
 - **AI**: Anthropic Claude via Replit AI Integrations (claude-sonnet-4-6 model, 200K context window)
-- **Styling**: Professional light banking theme — navy primary (hsl 215 75% 30%), teal accent (hsl 168 55% 35%), off-white backgrounds, white cards with subtle shadows
+- **Styling**: Corporate banking theme — deep navy primary (hsl 215 70% 25%), teal accent (hsl 198 50% 32%), dark navy sidebar (hsl 215 55% 16%), Inter font throughout, tight 0.375rem radius, clean card borders (no glassmorphism), restrained hover effects. No Outfit font, no emojis in agent avatars (uses initials instead)
 
 ## Key Features
 - **Projects**: Central organizing concept — each project has its own sessions, workflows, and phase tracking

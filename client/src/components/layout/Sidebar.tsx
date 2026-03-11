@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { 
-  Bot, 
   MessageSquare, 
   GitBranch, 
   Users, 
-  Sparkles,
   Menu,
   X,
   FolderKanban,
-  BookOpen
+  BookOpen,
+  Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,57 +29,55 @@ export function Sidebar() {
       <button 
         onClick={() => setIsOpen(!isOpen)}
         data-testid="button-sidebar-toggle"
-        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-md bg-card/80 backdrop-blur-sm border border-border"
+        className="md:hidden fixed top-3 left-3 z-50 p-2 rounded bg-card border border-border text-foreground"
       >
-        {isOpen ? <X size={20} /> : <Menu size={20} />}
+        {isOpen ? <X size={18} /> : <Menu size={18} />}
       </button>
 
       <aside className={cn(
-        "fixed md:sticky top-0 left-0 h-screen w-64 bg-white border-r border-border flex flex-col transition-transform duration-300 z-40",
+        "fixed md:sticky top-0 left-0 h-screen w-60 bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-200 z-40",
         isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}>
-        <div className="p-6 flex items-center gap-3 border-b border-border">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <Bot size={20} className="text-white" />
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-white/8">
+          <div className="w-8 h-8 rounded bg-sidebar-accent/90 flex items-center justify-center">
+            <Shield size={16} className="text-sidebar" />
           </div>
           <div>
-            <h1 className="font-heading font-bold text-lg leading-none text-foreground" data-testid="text-app-title">BMad</h1>
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <Sparkles size={10} className="text-accent" />
-              Claude Edition
-            </p>
+            <h1 className="font-semibold text-sm leading-none text-sidebar-foreground tracking-tight" data-testid="text-app-title">BMad Method</h1>
+            <p className="text-[10px] text-sidebar-muted mt-1 tracking-wide uppercase">Enterprise Platform</p>
           </div>
         </div>
 
-        <div className="flex-1 py-6 px-4 flex flex-col gap-1">
-          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+        <div className="flex-1 py-4 px-3 flex flex-col gap-0.5">
+          <div className="text-[10px] font-medium text-sidebar-muted uppercase tracking-widest mb-2 px-2">
             Navigation
           </div>
           {NAV_ITEMS.map((item) => {
-            const isActive = location === item.href;
+            const isActive = location === item.href || 
+              (item.href === "/projects" && location.startsWith("/projects/"));
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 data-testid={`link-nav-${item.label.toLowerCase()}`}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded text-[13px] transition-colors",
                   isActive 
-                    ? "bg-primary/8 text-primary font-medium" 
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    ? "bg-white/10 text-white font-medium" 
+                    : "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground"
                 )}
               >
-                <item.icon size={18} className={cn(
-                  "transition-colors",
-                  isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                )} />
+                <item.icon size={16} strokeWidth={1.5} />
                 {item.label}
-                {isActive && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-                )}
               </Link>
             );
           })}
+        </div>
+
+        <div className="px-3 pb-4">
+          <div className="px-2.5 py-2 text-[10px] text-sidebar-muted border-t border-white/8 pt-3">
+            Powered by Claude AI
+          </div>
         </div>
       </aside>
     </>

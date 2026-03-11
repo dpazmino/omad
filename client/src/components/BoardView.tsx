@@ -245,7 +245,7 @@ function EpicListView({ epics, stories, sprints, expandedEpics, onToggleEpic, ep
         const isExpanded = expandedEpics.has(epic.id);
 
         return (
-          <div key={epic.id} className="glass-card rounded-xl overflow-hidden" data-testid={`epic-card-${epic.id}`}>
+          <div key={epic.id} className="glass-card rounded-md overflow-hidden" data-testid={`epic-card-${epic.id}`}>
             <div
               className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
               onClick={() => onToggleEpic(epic.id)}
@@ -512,7 +512,7 @@ function StoryDetailModal({ story, epics, sprints, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-card rounded-md shadow-lg border border-border w-full max-w-2xl max-h-[85vh] overflow-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h3 className="font-semibold text-foreground">{isEditing ? "Edit Story" : "Story Details"}</h3>
           <div className="flex items-center gap-2">

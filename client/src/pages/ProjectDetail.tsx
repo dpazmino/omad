@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import {
-  ArrowLeft, Send, Bot, User, Sparkles, Plus, Loader2, MessageSquare,
+  ArrowLeft, Send, Bot, User, Users, Plus, Loader2, MessageSquare,
   GitBranch, ArrowRight, ChevronDown, Trash2, FolderKanban, Command,
   FileText, X, Download, PanelRightOpen, PanelRightClose, Eye, Code2
 } from "lucide-react";
@@ -34,7 +34,7 @@ const BMAD_PHASES = [
     id: "analysis",
     title: "1. Analysis",
     description: "Research, brainstorm, and define your product brief.",
-    agents: ["📊 Mary (Business Analyst)"],
+    agents: ["Mary (Business Analyst)"],
     commands: [
       { trigger: "BP", name: "Brainstorm Project" },
       { trigger: "MR", name: "Market Research" },
@@ -45,7 +45,7 @@ const BMAD_PHASES = [
     id: "planning",
     title: "2. Planning",
     description: "Create your PRD and UX design.",
-    agents: ["📋 John (Product Manager)", "🎨 Sally (UX Designer)"],
+    agents: ["John (Product Manager)", "Sally (UX Designer)"],
     commands: [
       { trigger: "CP", name: "Create PRD" },
       { trigger: "VP", name: "Validate PRD" },
@@ -56,7 +56,7 @@ const BMAD_PHASES = [
     id: "solutioning",
     title: "3. Solutioning",
     description: "Define architecture, create epics and stories.",
-    agents: ["🏗️ Winston (Lead Architect)", "📋 John (Product Manager)"],
+    agents: ["Winston (Lead Architect)", "John (Product Manager)"],
     commands: [
       { trigger: "CA", name: "Create Architecture" },
       { trigger: "CE", name: "Create Epics & Stories" },
@@ -67,7 +67,7 @@ const BMAD_PHASES = [
     id: "implementation",
     title: "4. Implementation",
     description: "Sprint planning, development, code review, and QA.",
-    agents: ["🏃 Bob (Scrum Master)", "💻 DevAI (Developer)", "🧪 Quinn (QA Engineer)"],
+    agents: ["Bob (Scrum Master)", "DevAI (Developer)", "Quinn (QA Engineer)"],
     commands: [
       { trigger: "SP", name: "Sprint Planning" },
       { trigger: "DS", name: "Dev Story" },
@@ -335,90 +335,90 @@ export default function ProjectDetail() {
     <Layout>
       <div className="flex-1 flex flex-col h-screen">
         {/* Project Header */}
-        <header className="border-b border-border bg-white shrink-0 px-6 py-3">
-          <div className="flex items-center gap-4 mb-2">
+        <header className="border-b border-border bg-card shrink-0 px-4 py-2.5">
+          <div className="flex items-center gap-3 mb-2">
             <Link href="/projects" data-testid="link-back-projects" className="text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft size={18} />
+              <ArrowLeft size={16} />
             </Link>
             <div className="flex items-center gap-2">
-              <FolderKanban size={18} className="text-primary" />
-              <h1 className="font-heading font-bold text-lg" data-testid="text-project-detail-name">{project.name}</h1>
+              <FolderKanban size={15} className="text-primary" />
+              <h1 className="font-semibold text-sm" data-testid="text-project-detail-name">{project.name}</h1>
             </div>
             {project.description && (
-              <span className="text-sm text-muted-foreground hidden md:block">— {project.description}</span>
+              <span className="text-xs text-muted-foreground hidden md:block">— {project.description}</span>
             )}
           </div>
 
           {/* Phase selector + tabs */}
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <div className="flex items-center gap-1 overflow-x-auto pb-1">
               {BMAD_PHASES.map((phase, idx) => (
-                <div key={phase.id} className="flex items-center gap-1.5">
+                <div key={phase.id} className="flex items-center gap-1">
                   <button
                     data-testid={`button-phase-${phase.id}`}
                     onClick={() => updatePhaseMutation.mutate(phase.id)}
                     className={cn(
-                      "px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-all",
+                      "px-2 py-1 rounded text-[11px] font-medium whitespace-nowrap border transition-colors",
                       project.phase === phase.id
-                        ? "bg-primary/10 text-primary border-primary/20"
-                        : "bg-muted text-muted-foreground border-border hover:border-primary/20 hover:text-foreground"
+                        ? "bg-primary text-white border-primary"
+                        : "bg-muted text-muted-foreground border-border hover:text-foreground"
                     )}
                   >
                     {phase.title}
                   </button>
                   {idx < BMAD_PHASES.length - 1 && (
-                    <ArrowRight size={12} className="text-muted-foreground/50 shrink-0" />
+                    <ArrowRight size={10} className="text-muted-foreground/40 shrink-0" />
                   )}
                 </div>
               ))}
             </div>
 
-            <div className="flex gap-1 shrink-0">
+            <div className="flex gap-0.5 shrink-0">
               <button
                 data-testid="tab-chat"
                 onClick={() => setActiveTab("chat")}
                 className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors",
+                  "px-2.5 py-1 rounded text-[11px] font-medium flex items-center gap-1 transition-colors",
                   activeTab === "chat"
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary text-white"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
-                <MessageSquare size={14} />
+                <MessageSquare size={12} />
                 Chat
               </button>
               <button
                 data-testid="tab-board"
                 onClick={() => setActiveTab("board")}
                 className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors",
+                  "px-2.5 py-1 rounded text-[11px] font-medium flex items-center gap-1 transition-colors",
                   activeTab === "board"
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary text-white"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
-                <FolderKanban size={14} />
+                <FolderKanban size={12} />
                 Board
               </button>
               <Link
                 href={`/projects/${projectId}/dev`}
                 data-testid="link-dev-view"
-                className="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+                className="px-2.5 py-1 rounded text-[11px] font-medium flex items-center gap-1 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
               >
-                <Code2 size={14} />
+                <Code2 size={12} />
                 Dev View
               </Link>
               <button
                 data-testid="tab-workflows"
                 onClick={() => setActiveTab("workflows")}
                 className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors",
+                  "px-2.5 py-1 rounded text-[11px] font-medium flex items-center gap-1 transition-colors",
                   activeTab === "workflows"
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary text-white"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
-                <GitBranch size={14} />
+                <GitBranch size={12} />
                 Workflows
               </button>
             </div>
@@ -524,7 +524,7 @@ function ChatView({
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Session sidebar */}
-      <div className="w-56 border-r border-border bg-white flex flex-col shrink-0 hidden md:flex">
+      <div className="w-56 border-r border-border bg-card flex flex-col shrink-0 hidden md:flex">
         <div className="p-3 border-b border-border flex items-center justify-between">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sessions</span>
           <button
@@ -573,26 +573,25 @@ function ChatView({
           <div className="relative group">
             <button
               data-testid="button-agent-selector"
-              className="px-2 py-1 rounded-md bg-primary/8 text-primary text-xs font-medium flex items-center gap-1 hover:bg-primary/15 transition-colors border border-primary/10"
+              className="px-2 py-1 rounded bg-muted text-foreground text-xs font-medium flex items-center gap-1.5 hover:bg-border transition-colors border border-border"
             >
-              <Bot size={12} />
-              {activeAgent ? `${activeAgent.icon} ${activeAgent.name}` : "Select Agent"}
+              <Users size={11} />
+              {activeAgent ? activeAgent.name : "Select Agent"}
               <ChevronDown size={10} />
             </button>
-            <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg border border-border shadow-lg hidden group-hover:block z-50 py-1">
+            <div className="absolute top-full left-0 mt-1 w-48 bg-card rounded border border-border shadow-md hidden group-hover:block z-50 py-0.5">
               {agents.filter(a => a.status === "active").map(agent => (
                 <button
                   key={agent.id}
                   data-testid={`button-agent-${agent.id}`}
                   onClick={() => onAgentSwitch(agent.id)}
                   className={cn(
-                    "w-full text-left px-3 py-2 text-xs hover:bg-muted flex items-center gap-2 transition-colors",
-                    agent.id === activeAgent?.id && "bg-primary/10 text-primary"
+                    "w-full text-left px-3 py-1.5 text-xs hover:bg-muted flex items-center gap-2 transition-colors",
+                    agent.id === activeAgent?.id && "bg-primary/8 text-primary"
                   )}
                 >
-                  <span>{agent.icon}</span>
                   <div>
-                    <div className="font-medium">{agent.name}</div>
+                    <div className="font-medium text-foreground">{agent.name}</div>
                     <div className="text-muted-foreground text-[10px]">{agent.title}</div>
                   </div>
                 </button>
@@ -604,14 +603,14 @@ function ChatView({
             data-testid="button-party-mode"
             onClick={() => onSetPartyMode(!partyMode)}
             className={cn(
-              "px-2 py-1 rounded-md text-xs font-medium border transition-colors flex items-center gap-1",
+              "px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1",
               partyMode
                 ? "bg-accent/10 text-accent border-accent/20"
                 : "bg-muted text-muted-foreground border-border hover:text-foreground"
             )}
           >
-            <Sparkles size={12} />
-            Party: {partyMode ? "On" : "Off"}
+            <Users size={11} />
+            Team: {partyMode ? "On" : "Off"}
           </button>
 
           <button
@@ -638,10 +637,10 @@ function ChatView({
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth" data-testid="chat-messages">
           {messages.length === 0 && !isStreaming && (
             <div className="flex flex-col items-center justify-center h-full text-center animate-in fade-in duration-500">
-              <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-sm">
-                <Bot size={32} className="text-white" />
+              <div className="w-10 h-10 rounded bg-primary flex items-center justify-center mb-3">
+                <Bot size={20} className="text-white" />
               </div>
-              <h2 className="text-xl font-heading font-bold mb-2">
+              <h2 className="text-base font-semibold mb-1">
                 Phase: {currentPhase.title}
               </h2>
               <p className="text-muted-foreground max-w-md mb-4 text-sm">
@@ -661,7 +660,7 @@ function ChatView({
                       disabled={!prereqsMet}
                       title={!prereqsMet ? `Requires: ${prereqs!.label}` : undefined}
                       className={cn(
-                        "px-3 py-1.5 text-xs border rounded-lg transition-colors",
+                        "px-2.5 py-1 text-xs border rounded transition-colors",
                         prereqsMet
                           ? "bg-muted hover:bg-border border-border text-muted-foreground hover:text-foreground cursor-pointer"
                           : "bg-muted/50 border-border/50 text-muted-foreground/40 cursor-not-allowed"
@@ -689,16 +688,16 @@ function ChatView({
           ))}
 
           {isStreaming && !partyMode && streamingContent && (
-            <div className="flex max-w-4xl mr-auto animate-in fade-in">
-              <div className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 mt-1 shadow-sm">
-                  <Bot size={16} className="text-white" />
+            <div className="flex max-w-4xl mr-auto">
+              <div className="flex gap-3 items-start">
+                <div className="w-7 h-7 rounded bg-primary flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-semibold text-white">
+                  AI
                 </div>
-                <div className="flex flex-col gap-1 items-start">
-                  <span className="text-xs text-muted-foreground font-medium ml-1">
-                    {activeAgent ? `${activeAgent.icon} ${activeAgent.name} (${activeAgent.title})` : "Agent"}
+                <div className="flex flex-col gap-0.5 items-start">
+                  <span className="text-[10px] text-muted-foreground font-medium ml-0.5">
+                    {activeAgent ? `${activeAgent.name} — ${activeAgent.title}` : "Agent"}
                   </span>
-                  <div className="bg-white px-5 py-3.5 rounded-2xl rounded-tl-sm border border-border shadow-sm max-w-[85%]">
+                  <div className="bg-card px-4 py-3 rounded border border-border max-w-[85%]">
                     <div className="prose prose-sm max-w-none">
                       <ReactMarkdown>{streamingContent}</ReactMarkdown>
                     </div>
@@ -709,21 +708,21 @@ function ChatView({
           )}
 
           {isStreaming && partyMode && partyResponses.map((pr, idx) => (
-            <div key={idx} className="flex max-w-4xl mr-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 mt-1 shadow-sm">
-                  <Bot size={16} className="text-white" />
+            <div key={idx} className="flex max-w-4xl mr-auto">
+              <div className="flex gap-3 items-start">
+                <div className="w-7 h-7 rounded bg-primary flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-semibold text-white">
+                  AI
                 </div>
-                <div className="flex flex-col gap-1 items-start">
-                  <span className="text-xs text-muted-foreground font-medium ml-1">{pr.agentName}</span>
-                  <div className="bg-white px-5 py-3.5 rounded-2xl rounded-tl-sm border border-border shadow-sm max-w-[85%]">
+                <div className="flex flex-col gap-0.5 items-start">
+                  <span className="text-[10px] text-muted-foreground font-medium ml-0.5">{pr.agentName}</span>
+                  <div className="bg-card px-4 py-3 rounded border border-border max-w-[85%]">
                     <div className="prose prose-sm max-w-none">
                       <ReactMarkdown>{pr.content}</ReactMarkdown>
                     </div>
                     {!pr.done && (
                       <div className="flex items-center gap-1.5 mt-2">
-                        <Loader2 size={12} className="animate-spin text-primary" />
-                        <span className="text-xs text-muted-foreground">thinking...</span>
+                        <Loader2 size={11} className="animate-spin text-primary" />
+                        <span className="text-[10px] text-muted-foreground">Processing...</span>
                       </div>
                     )}
                   </div>
@@ -733,15 +732,15 @@ function ChatView({
           ))}
 
           {isStreaming && !streamingContent && partyResponses.length === 0 && (
-            <div className="flex max-w-4xl mr-auto animate-in fade-in">
-              <div className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-lg bg-primary/60 flex items-center justify-center shrink-0 mt-1">
-                  <Bot size={16} className="text-white" />
+            <div className="flex max-w-4xl mr-auto">
+              <div className="flex gap-3 items-start">
+                <div className="w-7 h-7 rounded bg-primary/70 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-semibold text-white">
+                  AI
                 </div>
-                <div className="bg-white px-5 py-4 rounded-2xl rounded-tl-sm border border-border shadow-sm flex items-center gap-1.5 mt-1">
-                  <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
-                  <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
-                  <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" />
+                <div className="bg-card px-4 py-3 rounded border border-border flex items-center gap-1.5 mt-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.3s]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.15s]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce" />
                 </div>
               </div>
             </div>
@@ -777,10 +776,9 @@ function ChatView({
           </div>
         )}
 
-        {/* Input */}
-        <div className="p-4 shrink-0 bg-white border-t border-border z-10">
-          <form onSubmit={onSend} className="max-w-4xl mx-auto relative group" data-testid="chat-form">
-            <div className="relative flex items-end gap-2 bg-background border border-border rounded-xl p-2 shadow-sm transition-all duration-300 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
+        <div className="p-3 shrink-0 bg-card border-t border-border z-10">
+          <form onSubmit={onSend} className="max-w-4xl mx-auto relative" data-testid="chat-form">
+            <div className="relative flex items-end gap-2 bg-background border border-border rounded p-1.5 transition-colors focus-within:border-primary/40">
               <div className="flex-1 pl-2">
                 <textarea
                   data-testid="input-chat"
@@ -789,8 +787,8 @@ function ChatView({
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(e); }
                   }}
-                  placeholder={activeAgent ? `Ask ${activeAgent.name} (${activeAgent.title})...` : "Start typing..."}
-                  className="w-full max-h-32 min-h-[44px] bg-transparent border-none outline-none resize-none py-3 text-sm placeholder:text-muted-foreground focus:ring-0 text-foreground"
+                  placeholder={activeAgent ? `Message ${activeAgent.name}...` : "Type a message..."}
+                  className="w-full max-h-28 min-h-[36px] bg-transparent border-none outline-none resize-none py-2 text-sm placeholder:text-muted-foreground focus:ring-0 text-foreground"
                   rows={1}
                   disabled={isStreaming || !activeSessionId}
                 />
@@ -799,25 +797,25 @@ function ChatView({
                 type="submit"
                 data-testid="button-send"
                 disabled={!input.trim() || isStreaming || !activeSessionId}
-                className="w-10 h-10 shrink-0 rounded-lg bg-primary text-white flex items-center justify-center mb-1 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all duration-200"
+                className="w-8 h-8 shrink-0 rounded bg-primary text-white flex items-center justify-center mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
               >
                 {isStreaming ? (
-                  <Loader2 size={16} className="animate-spin" />
+                  <Loader2 size={14} className="animate-spin" />
                 ) : (
-                  <Send size={16} className={cn("transition-transform duration-200", input.trim() && "translate-x-0.5 -translate-y-0.5")} />
+                  <Send size={14} />
                 )}
               </button>
             </div>
-            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground px-1">
+            <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground px-0.5">
               <button
                 type="button"
                 data-testid="button-help"
                 onClick={() => onSetInput("/bmad-help")}
                 className="hover:text-primary transition-colors flex items-center gap-1"
               >
-                <Command size={12} /> /bmad-help
+                <Command size={10} /> /bmad-help
               </button>
-              <div>Press <kbd className="font-mono bg-muted px-1 py-0.5 rounded text-[10px] border border-border">Enter</kbd> to send</div>
+              <span>Press <kbd className="font-mono bg-muted px-1 py-0.5 rounded border border-border">Enter</kbd> to send</span>
             </div>
           </form>
         </div>
@@ -833,7 +831,7 @@ function WorkflowsView({ phase }: { phase: string }) {
     <div className="flex-1 overflow-y-auto p-6 space-y-6 animate-in fade-in duration-300">
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
-          <h2 className="text-xl font-heading font-bold mb-1">Project Workflows</h2>
+          <h2 className="text-xl font-semibold mb-1">Project Workflows</h2>
           <p className="text-sm text-muted-foreground">
             Follow the BMad Method phases to guide your project from idea to implementation.
           </p>
@@ -848,7 +846,7 @@ function WorkflowsView({ phase }: { phase: string }) {
               key={phase.id}
               data-testid={`card-workflow-phase-${phase.id}`}
               className={cn(
-                "bg-white p-5 rounded-xl border shadow-sm relative overflow-hidden transition-all",
+                "bg-card p-4 rounded-md border relative overflow-hidden transition-colors",
                 isCurrent ? "border-primary/20" : "border-border",
                 isPast && "opacity-70"
               )}
@@ -872,7 +870,7 @@ function WorkflowsView({ phase }: { phase: string }) {
                       isCurrent ? "text-primary" : isPast ? "text-green-500" : "text-muted-foreground"
                     )} />
                   </div>
-                  <h3 className="text-lg font-heading font-semibold">{phase.title}</h3>
+                  <h3 className="text-lg font-semibold text-sm">{phase.title}</h3>
                   {isCurrent && (
                     <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-medium border border-primary/30">
                       Current
@@ -938,24 +936,24 @@ function MessageBubble({ message, agents, isLastAssistantMessage, isStreaming, o
     >
       <div className={cn("flex gap-4 items-start", isUser ? "flex-row-reverse" : "flex-row")}>
         <div className={cn(
-          "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-1",
+          "w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-semibold",
           isUser
-            ? "bg-muted border border-border"
-            : "bg-primary text-white shadow-sm"
+            ? "bg-muted border border-border text-muted-foreground"
+            : "bg-primary text-white"
         )}>
-          {isUser ? <User size={16} className="text-muted-foreground" /> : (
-            agent ? <span className="text-sm">{agent.icon}</span> : <Bot size={16} />
+          {isUser ? <User size={14} className="text-muted-foreground" /> : (
+            agent ? agent.name.slice(0, 2).toUpperCase() : "AI"
           )}
         </div>
-        <div className={cn("flex flex-col gap-1", isUser ? "items-end" : "items-start")}>
+        <div className={cn("flex flex-col gap-0.5", isUser ? "items-end" : "items-start")}>
           {!isUser && message.agentName && (
-            <span className="text-xs text-muted-foreground font-medium ml-1">{message.agentName}</span>
+            <span className="text-[10px] text-muted-foreground font-medium ml-0.5">{message.agentName}</span>
           )}
           <div className={cn(
-            "px-5 py-3.5 rounded-2xl text-sm leading-relaxed",
+            "px-4 py-3 rounded text-sm leading-relaxed",
             isUser
-              ? "bg-primary text-primary-foreground rounded-tr-sm max-w-[85%]"
-              : "bg-white text-foreground rounded-tl-sm border border-border shadow-sm max-w-full min-w-[300px]"
+              ? "bg-primary text-primary-foreground max-w-[85%]"
+              : "bg-card text-foreground border border-border max-w-full min-w-[300px]"
           )}>
             {isUser ? (
               message.content
@@ -975,20 +973,20 @@ function MessageBubble({ message, agents, isLastAssistantMessage, isStreaming, o
 }
 
 const DOC_TYPE_ICONS: Record<string, { icon: string; color: string }> = {
-  "product-brief": { icon: "📋", color: "text-blue-600" },
-  "brainstorm": { icon: "💡", color: "text-yellow-600" },
-  "market-research": { icon: "📊", color: "text-green-600" },
-  "prd": { icon: "📄", color: "text-purple-600" },
-  "ux-design": { icon: "🎨", color: "text-pink-600" },
-  "architecture": { icon: "🏗️", color: "text-orange-600" },
-  "epic": { icon: "📦", color: "text-yellow-600" },
-  "stories": { icon: "📝", color: "text-cyan-600" },
-  "sprint-plan": { icon: "🏃", color: "text-emerald-600" },
-  "implementation-plan": { icon: "⚙️", color: "text-amber-600" },
-  "code-review": { icon: "🔍", color: "text-red-600" },
-  "qa-report": { icon: "✅", color: "text-teal-600" },
-  "test-plan": { icon: "🧪", color: "text-indigo-600" },
-  "general": { icon: "📎", color: "text-gray-500" },
+  "product-brief": { icon: "PB", color: "text-blue-600" },
+  "brainstorm": { icon: "BS", color: "text-yellow-600" },
+  "market-research": { icon: "MR", color: "text-green-600" },
+  "prd": { icon: "PR", color: "text-purple-600" },
+  "ux-design": { icon: "UX", color: "text-pink-600" },
+  "architecture": { icon: "AR", color: "text-orange-600" },
+  "epic": { icon: "EP", color: "text-yellow-600" },
+  "stories": { icon: "ST", color: "text-cyan-600" },
+  "sprint-plan": { icon: "SP", color: "text-emerald-600" },
+  "implementation-plan": { icon: "IP", color: "text-amber-600" },
+  "code-review": { icon: "CR", color: "text-red-600" },
+  "qa-report": { icon: "QA", color: "text-teal-600" },
+  "test-plan": { icon: "TP", color: "text-indigo-600" },
+  "general": { icon: "GN", color: "text-gray-500" },
 };
 
 function DocumentsPanel({
@@ -1004,7 +1002,7 @@ function DocumentsPanel({
   const [scanning, setScanning] = useState(false);
 
   return (
-    <div className="w-80 border-l border-border bg-white flex flex-col shrink-0 hidden lg:flex animate-in slide-in-from-right-5 duration-300" data-testid="documents-panel">
+    <div className="w-80 border-l border-border bg-card flex flex-col shrink-0 hidden lg:flex" data-testid="documents-panel">
       <div className="p-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FileText size={14} className="text-primary" />
@@ -1057,7 +1055,7 @@ function DocumentsPanel({
         <div className="flex-1 overflow-y-auto py-2 px-2 space-y-1">
           {documents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4 py-8">
-              <div className="w-12 h-12 rounded-xl bg-muted border border-border flex items-center justify-center mb-3">
+              <div className="w-10 h-10 rounded bg-muted border border-border flex items-center justify-center mb-3">
                 <FileText size={20} className="text-muted-foreground" />
               </div>
               <p className="text-xs text-muted-foreground mb-1 font-medium">No documents yet</p>
@@ -1072,11 +1070,11 @@ function DocumentsPanel({
                 <div
                   key={doc.id}
                   data-testid={`doc-item-${doc.id}`}
-                  className="group bg-white rounded-lg border border-border hover:border-primary/20 hover:shadow-sm transition-all cursor-pointer"
+                  className="group bg-card rounded border border-border hover:border-primary/15 transition-colors cursor-pointer"
                 >
                   <div className="p-3" onClick={() => onViewDoc(doc)}>
                     <div className="flex items-start gap-2.5">
-                      <span className="text-lg mt-0.5">{typeInfo.icon}</span>
+                      <span className={cn("text-[10px] font-semibold w-7 h-7 rounded bg-muted border border-border flex items-center justify-center shrink-0 mt-0.5", typeInfo.color)}>{typeInfo.icon}</span>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-foreground truncate">{doc.title}</div>
                         <div className="flex items-center gap-2 mt-1">

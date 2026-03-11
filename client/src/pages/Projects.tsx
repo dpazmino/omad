@@ -2,24 +2,24 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
-import { Plus, FolderKanban, Clock, ArrowRight, Trash2, MoreVertical } from "lucide-react";
+import { Plus, FolderKanban, Clock, Trash2, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchProjects, createProject, deleteProject, updateProject } from "@/lib/api";
 import type { Project } from "@shared/schema";
 
 const PHASE_LABELS: Record<string, { label: string; color: string }> = {
-  analysis: { label: "Analysis", color: "bg-blue-500" },
-  planning: { label: "Planning", color: "bg-purple-500" },
-  solutioning: { label: "Solutioning", color: "bg-amber-500" },
-  implementation: { label: "Implementation", color: "bg-green-500" },
-  completed: { label: "Completed", color: "bg-emerald-500" },
+  analysis: { label: "Analysis", color: "bg-blue-600" },
+  planning: { label: "Planning", color: "bg-violet-600" },
+  solutioning: { label: "Solutioning", color: "bg-amber-600" },
+  implementation: { label: "Implementation", color: "bg-emerald-600" },
+  completed: { label: "Completed", color: "bg-green-600" },
 };
 
 const STATUS_LABELS: Record<string, { label: string; dotColor: string }> = {
-  active: { label: "In Progress", dotColor: "bg-green-500" },
+  active: { label: "Active", dotColor: "bg-green-500" },
   paused: { label: "Paused", dotColor: "bg-yellow-500" },
-  completed: { label: "Completed", dotColor: "bg-emerald-500" },
-  archived: { label: "Archived", dotColor: "bg-gray-500" },
+  completed: { label: "Completed", dotColor: "bg-green-600" },
+  archived: { label: "Archived", dotColor: "bg-gray-400" },
 };
 
 export default function Projects() {
@@ -60,56 +60,56 @@ export default function Projects() {
   return (
     <Layout>
       <div className="flex-1 overflow-y-auto bg-background">
-        <div className="p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
+        <div className="p-6 max-w-5xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-heading font-bold mb-2 text-foreground" data-testid="text-projects-title">Projects</h1>
-              <p className="text-muted-foreground">Manage your BMad development projects.</p>
+              <h1 className="text-xl font-semibold text-foreground" data-testid="text-projects-title">Projects</h1>
+              <p className="text-sm text-muted-foreground mt-1">Manage development projects.</p>
             </div>
             <button
               data-testid="button-create-project"
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded text-sm font-medium transition-colors"
             >
-              <Plus size={16} />
-              Create Project
+              <Plus size={14} />
+              New Project
             </button>
           </div>
 
           {showCreate && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm animate-in fade-in duration-200">
-              <div className="bg-white w-full max-w-md p-6 rounded-2xl border border-border shadow-xl animate-in zoom-in-95 duration-200">
-                <h2 className="text-xl font-heading font-bold mb-4 text-foreground">New Project</h2>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm">
+              <div className="bg-card w-full max-w-md p-6 rounded-md border border-border shadow-lg">
+                <h2 className="text-base font-semibold mb-4 text-foreground">New Project</h2>
                 <form onSubmit={handleCreate} className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-foreground block mb-1.5">Project Name</label>
+                    <label className="text-sm font-medium text-foreground block mb-1">Project Name</label>
                     <input
                       data-testid="input-project-name"
                       type="text"
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
-                      placeholder="My Awesome App"
-                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all text-sm"
+                      placeholder="Enter project name"
+                      className="w-full px-3 py-2 rounded bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-sm"
                       autoFocus
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-foreground block mb-1.5">Description (optional)</label>
+                    <label className="text-sm font-medium text-foreground block mb-1">Description (optional)</label>
                     <textarea
                       data-testid="input-project-description"
                       value={newDescription}
                       onChange={(e) => setNewDescription(e.target.value)}
-                      placeholder="Brief description of what you're building..."
-                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all text-sm min-h-[80px] resize-none"
+                      placeholder="Brief project description"
+                      className="w-full px-3 py-2 rounded bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-sm min-h-[72px] resize-none"
                       rows={3}
                     />
                   </div>
-                  <div className="flex gap-3 justify-end pt-2">
+                  <div className="flex gap-2 justify-end pt-1">
                     <button
                       type="button"
                       data-testid="button-cancel-create"
                       onClick={() => { setShowCreate(false); setNewName(""); setNewDescription(""); }}
-                      className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      className="px-3 py-2 rounded text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     >
                       Cancel
                     </button>
@@ -117,9 +117,9 @@ export default function Projects() {
                       type="submit"
                       data-testid="button-confirm-create"
                       disabled={!newName.trim() || createMutation.isPending}
-                      className="px-5 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50"
+                      className="px-4 py-2 rounded bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50"
                     >
-                      {createMutation.isPending ? "Creating..." : "Create Project"}
+                      {createMutation.isPending ? "Creating..." : "Create"}
                     </button>
                   </div>
                 </form>
@@ -128,34 +128,34 @@ export default function Projects() {
           )}
 
           {isLoading ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {[1, 2, 3].map(i => (
-                <div key={i} className="bg-white h-32 rounded-xl border border-border animate-pulse" />
+                <div key={i} className="bg-card h-24 rounded-md border border-border animate-pulse" />
               ))}
             </div>
           ) : projects.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-primary/8 border border-primary/10 flex items-center justify-center mb-4">
-                <FolderKanban size={32} className="text-primary" />
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-12 h-12 rounded bg-muted flex items-center justify-center mb-3">
+                <FolderKanban size={24} className="text-muted-foreground" />
               </div>
-              <h2 className="text-xl font-heading font-semibold mb-2 text-foreground">No projects yet</h2>
-              <p className="text-muted-foreground max-w-sm mb-6">
-                Create your first project to start using the BMad Method with your AI development team.
+              <h2 className="text-base font-semibold mb-1 text-foreground">No projects yet</h2>
+              <p className="text-sm text-muted-foreground max-w-sm mb-4">
+                Create your first project to begin.
               </p>
               <button
                 data-testid="button-create-first-project"
                 onClick={() => setShowCreate(true)}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded text-sm font-medium transition-colors"
               >
-                <Plus size={16} />
-                Create Your First Project
+                <Plus size={14} />
+                New Project
               </button>
             </div>
           ) : (
             <>
               {activeProjects.length > 0 && (
-                <div className="space-y-4">
-                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">In Progress ({activeProjects.length})</h2>
+                <div className="space-y-2">
+                  <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active ({activeProjects.length})</h2>
                   {activeProjects.map((project) => (
                     <ProjectCard key={project.id} project={project} onDelete={() => deleteMutation.mutate(project.id)} />
                   ))}
@@ -163,8 +163,8 @@ export default function Projects() {
               )}
 
               {otherProjects.length > 0 && (
-                <div className="space-y-4">
-                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Other ({otherProjects.length})</h2>
+                <div className="space-y-2">
+                  <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Other ({otherProjects.length})</h2>
                   {otherProjects.map((project) => (
                     <ProjectCard key={project.id} project={project} onDelete={() => deleteMutation.mutate(project.id)} />
                   ))}
@@ -188,38 +188,29 @@ function ProjectCard({ project, onDelete }: { project: Project; onDelete: () => 
     <div
       data-testid={`card-project-${project.id}`}
       onClick={() => navigate(`/projects/${project.id}`)}
-      className="bg-white p-5 rounded-xl border border-border relative overflow-hidden group transition-all duration-200 hover:border-primary/20 hover:shadow-md cursor-pointer"
+      className="bg-card p-4 rounded-md border border-border relative group transition-colors hover:border-primary/15 cursor-pointer"
     >
-      <div className={cn("absolute left-0 top-0 bottom-0 w-1", phase.color)} />
+      <div className={cn("absolute left-0 top-0 bottom-0 w-0.5 rounded-l", phase.color)} />
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 pl-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-lg bg-primary/8 border border-primary/10">
-              <FolderKanban size={18} className="text-primary" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-lg font-heading font-semibold truncate text-foreground" data-testid={`text-project-name-${project.id}`}>
-                {project.name}
-              </h3>
-              {project.description && (
-                <p className="text-sm text-muted-foreground truncate mt-0.5">{project.description}</p>
-              )}
-            </div>
-          </div>
+          <h3 className="text-sm font-semibold text-foreground truncate" data-testid={`text-project-name-${project.id}`}>
+            {project.name}
+          </h3>
+          {project.description && (
+            <p className="text-xs text-muted-foreground truncate mt-0.5">{project.description}</p>
+          )}
 
-          <div className="flex items-center gap-3 ml-12 mt-3 flex-wrap">
-            <span className={cn("px-2.5 py-1 rounded-md text-xs font-medium border", 
-              `${phase.color}/10 text-foreground border-border`
-            )}>
-              Phase: {phase.label}
+          <div className="flex items-center gap-3 mt-2">
+            <span className={cn("px-2 py-0.5 rounded text-[10px] font-medium text-white", phase.color)}>
+              {phase.label}
             </span>
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <div className={cn("w-2 h-2 rounded-full", status.dotColor)} />
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <div className={cn("w-1.5 h-1.5 rounded-full", status.dotColor)} />
               {status.label}
             </span>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Clock size={12} />
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Clock size={10} />
               {new Date(project.createdAt).toLocaleDateString()}
             </span>
           </div>
@@ -229,21 +220,21 @@ function ProjectCard({ project, onDelete }: { project: Project; onDelete: () => 
           <button
             data-testid={`button-project-menu-${project.id}`}
             onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-            className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
-            <MoreVertical size={16} />
+            <MoreVertical size={14} />
           </button>
           {showMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg border border-border shadow-lg z-50 py-1">
+              <div className="absolute right-0 top-full mt-1 w-36 bg-card rounded border border-border shadow-md z-50 py-1">
                 <button
                   data-testid={`button-delete-project-${project.id}`}
                   onClick={() => { onDelete(); setShowMenu(false); }}
-                  className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-muted flex items-center gap-2 transition-colors"
+                  className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-muted flex items-center gap-2 transition-colors"
                 >
-                  <Trash2 size={14} />
-                  Delete Project
+                  <Trash2 size={12} />
+                  Delete
                 </button>
               </div>
             </>

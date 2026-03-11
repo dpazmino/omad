@@ -6,7 +6,7 @@ import type { Story, Epic, Sprint } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import {
   ArrowLeft, Copy, Check, AlertTriangle, ArrowUp, ArrowDown, Minus,
-  ChevronDown, ChevronRight, Merge, ClipboardList, Sparkles, X,
+  ChevronDown, ChevronRight, Merge, ClipboardList, X,
   CheckCircle2, FileText, Loader2, RefreshCw, Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -185,36 +185,36 @@ export default function DevView() {
   return (
     <Layout>
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
+        <header className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-card shrink-0">
           <Link href={`/projects/${projectId}`} data-testid="link-back-to-project" className="text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
           </Link>
           <div className="flex-1">
-            <h1 className="text-lg font-heading font-semibold text-foreground" data-testid="text-dev-view-title">Dev View</h1>
-            <p className="text-xs text-muted-foreground">
-              {inProgressStories.length} in-progress stories &middot; {storiesWithPrompts.length} with prompts
+            <h1 className="text-sm font-semibold text-foreground" data-testid="text-dev-view-title">Dev View</h1>
+            <p className="text-[10px] text-muted-foreground">
+              {inProgressStories.length} in-progress &middot; {storiesWithPrompts.length} with prompts
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               data-testid="button-show-duplicates"
               onClick={() => setShowDuplicates(!showDuplicates)}
-              className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+              className={cn("flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors",
                 showDuplicates ? "bg-amber-100 text-amber-800" : "text-muted-foreground hover:bg-muted"
               )}
             >
-              <Merge size={14} /> Duplicates
+              <Merge size={12} /> Duplicates
               {duplicates && duplicates.groups.length > 0 && (
-                <span className="bg-amber-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{duplicates.groups.length}</span>
+                <span className="bg-amber-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center ml-0.5">{duplicates.groups.length}</span>
               )}
             </button>
             <button
               data-testid="button-aggregate-prompts"
               onClick={handleAggregate}
               disabled={aggregating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
             >
-              {aggregating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {aggregating ? "Synthesizing..." : "Aggregate Prompts"}
+              {aggregating ? <Loader2 size={12} className="animate-spin" /> : <ClipboardList size={12} />} {aggregating ? "Synthesizing..." : "Aggregate Prompts"}
             </button>
           </div>
         </header>
@@ -556,7 +556,7 @@ function DuplicatePanel({ groups, stories, epics, onMerge, onClose }: {
             const dupes = group.duplicates.map(id => storyMap.get(id)).filter(Boolean) as Story[];
 
             return (
-              <div key={gi} className="glass-card rounded-xl p-4" data-testid={`duplicate-group-${gi}`}>
+              <div key={gi} className="glass-card rounded-md p-4" data-testid={`duplicate-group-${gi}`}>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded">{group.reason}</span>
                   <button

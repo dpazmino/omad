@@ -1,7 +1,7 @@
 import { Layout } from "@/components/layout/Layout";
 import { Link } from "wouter";
 import {
-  BookOpen, ArrowRight, MessageSquare, FolderKanban, GitBranch,
+  BookOpen, ArrowRight, MessageSquare, FolderKanban,
   Lightbulb, FileText, Layers, CheckCircle2, Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,14 +35,14 @@ const STEPS = [
   },
   {
     phase: "3. Solutioning",
-    color: "bg-purple-50 border-purple-200 text-purple-800",
+    color: "bg-violet-50 border-violet-200 text-violet-800",
     icon: Layers,
-    iconColor: "text-purple-600",
+    iconColor: "text-violet-600",
     description: "Define architecture, then generate your epics and stories for the Board.",
     agent: "Winston (Architect) & John (Product Manager)",
     commands: [
       { trigger: "CA", name: "Create Architecture", detail: "Document technical architecture decisions" },
-      { trigger: "CE", name: "Create Epics & Stories", detail: "Generates epics and stories — these populate your Board" },
+      { trigger: "CE", name: "Create Epics & Stories", detail: "Generates epics and stories for your Board" },
       { trigger: "IR", name: "Implementation Readiness", detail: "Verify PRD, UX, and architecture are aligned" },
     ],
     highlight: true,
@@ -66,166 +66,166 @@ export default function Guide() {
   return (
     <Layout>
       <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <BookOpen size={22} className="text-primary" />
+        <div className="max-w-4xl mx-auto px-6 py-6">
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center">
+              <BookOpen size={16} className="text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-guide-title">
+              <h1 className="text-lg font-semibold text-foreground" data-testid="text-guide-title">
                 How to Use BMad
               </h1>
-              <p className="text-sm text-muted-foreground">
-                A step-by-step guide to the BMad Method workflow
+              <p className="text-xs text-muted-foreground">
+                Step-by-step guide to the BMad Method workflow
               </p>
             </div>
           </div>
 
-          <div className="mt-8 glass-card p-6 rounded-xl" data-testid="section-quick-start">
-            <h2 className="text-lg font-heading font-semibold text-foreground mb-3">Quick Start</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-sm font-bold text-primary">1</span>
+          <div className="mt-6 bg-card p-5 rounded-md border border-border" data-testid="section-quick-start">
+            <h2 className="text-sm font-semibold text-foreground mb-3">Quick Start</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="flex items-start gap-2.5 p-3 rounded bg-muted/50 border border-border">
+                <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold text-primary">1</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">Create a Project</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Go to <Link href="/projects" className="text-primary underline">Projects</Link> and create a new project for your product idea.
+                  <p className="text-xs font-medium text-foreground">Create a Project</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Go to <Link href="/projects" className="text-primary underline">Projects</Link> and create a new project.
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-sm font-bold text-primary">2</span>
+              <div className="flex items-start gap-2.5 p-3 rounded bg-muted/50 border border-border">
+                <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold text-primary">2</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">Use Chat Commands</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Inside your project, use the <MessageSquare size={12} className="inline" /> Chat tab to run commands with AI agents.
+                  <p className="text-xs font-medium text-foreground">Use Chat Commands</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Inside your project, use the <MessageSquare size={10} className="inline" /> Chat tab to run commands.
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-sm font-bold text-primary">3</span>
+              <div className="flex items-start gap-2.5 p-3 rounded bg-muted/50 border border-border">
+                <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold text-primary">3</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">View Your Board</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    After running <strong>CE</strong> (Create Epics), switch to the <FolderKanban size={12} className="inline" /> Board tab to see your stories.
+                  <p className="text-xs font-medium text-foreground">View Your Board</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    After running <strong>CE</strong>, switch to the <FolderKanban size={10} className="inline" /> Board tab.
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-8 glass-card p-6 rounded-xl border-2 border-primary/20" data-testid="section-board-explained">
-            <div className="flex items-center gap-2 mb-3">
-              <FolderKanban size={20} className="text-primary" />
-              <h2 className="text-lg font-heading font-semibold text-foreground">When Do Stories Appear on the Board?</h2>
+          <div className="mt-4 bg-card p-5 rounded-md border border-primary/15" data-testid="section-board-explained">
+            <div className="flex items-center gap-2 mb-2">
+              <FolderKanban size={14} className="text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">When Do Stories Appear on the Board?</h2>
             </div>
-            <div className="space-y-3 text-sm text-muted-foreground">
+            <div className="space-y-2 text-xs text-muted-foreground">
               <p>
-                The <strong className="text-foreground">Board</strong> tab inside each project is your Jira-like project management view. It shows epics, stories, and sprints. Here's how stories get there:
+                The <strong className="text-foreground">Board</strong> tab shows epics, stories, and sprints. Here's how stories get there:
               </p>
-              <div className="bg-primary/5 rounded-lg p-4 space-y-2">
-                <div className="flex items-start gap-2">
-                  <ArrowRight size={14} className="text-primary mt-0.5 shrink-0" />
-                  <p><strong className="text-foreground">Step 1:</strong> Complete the Analysis phase — run <code className="bg-muted px-1.5 py-0.5 rounded text-xs">BP</code> (Brainstorm) and <code className="bg-muted px-1.5 py-0.5 rounded text-xs">CB</code> (Create Brief)</p>
+              <div className="bg-muted/50 rounded p-3 space-y-1.5 border border-border">
+                <div className="flex items-start gap-1.5">
+                  <ArrowRight size={10} className="text-primary mt-0.5 shrink-0" />
+                  <p><strong className="text-foreground">Step 1:</strong> Complete Analysis — run <code className="bg-muted px-1 py-0.5 rounded text-[10px]">BP</code> and <code className="bg-muted px-1 py-0.5 rounded text-[10px]">CB</code></p>
                 </div>
-                <div className="flex items-start gap-2">
-                  <ArrowRight size={14} className="text-primary mt-0.5 shrink-0" />
-                  <p><strong className="text-foreground">Step 2:</strong> Run <code className="bg-muted px-1.5 py-0.5 rounded text-xs">CP</code> (Create PRD) to generate your product requirements</p>
+                <div className="flex items-start gap-1.5">
+                  <ArrowRight size={10} className="text-primary mt-0.5 shrink-0" />
+                  <p><strong className="text-foreground">Step 2:</strong> Run <code className="bg-muted px-1 py-0.5 rounded text-[10px]">CP</code> to generate product requirements</p>
                 </div>
-                <div className="flex items-start gap-2">
-                  <ArrowRight size={14} className="text-primary mt-0.5 shrink-0" />
-                  <p><strong className="text-foreground">Step 3:</strong> Run <code className="bg-muted px-1.5 py-0.5 rounded text-xs">CA</code> (Create Architecture) to define technical decisions</p>
+                <div className="flex items-start gap-1.5">
+                  <ArrowRight size={10} className="text-primary mt-0.5 shrink-0" />
+                  <p><strong className="text-foreground">Step 3:</strong> Run <code className="bg-muted px-1 py-0.5 rounded text-[10px]">CA</code> to define architecture</p>
                 </div>
-                <div className="flex items-start gap-2 bg-primary/5 -mx-1 px-1 py-1 rounded">
-                  <ArrowRight size={14} className="text-primary mt-0.5 shrink-0" />
-                  <p><strong className="text-primary">Step 4:</strong> Run <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs font-semibold">CE</code> (Create Epics & Stories) — this is the command that generates your epics and stories</p>
+                <div className="flex items-start gap-1.5 bg-primary/5 -mx-1 px-1 py-1 rounded">
+                  <ArrowRight size={10} className="text-primary mt-0.5 shrink-0" />
+                  <p><strong className="text-primary">Step 4:</strong> Run <code className="bg-primary/10 text-primary px-1 py-0.5 rounded text-[10px] font-semibold">CE</code> — generates epics and stories</p>
                 </div>
-                <div className="flex items-start gap-2">
-                  <ArrowRight size={14} className="text-primary mt-0.5 shrink-0" />
-                  <p><strong className="text-foreground">Step 5:</strong> Go to the <strong className="text-foreground">Board</strong> tab and click <strong className="text-foreground">"Import from Documents"</strong> to pull the epics and stories into your board</p>
+                <div className="flex items-start gap-1.5">
+                  <ArrowRight size={10} className="text-primary mt-0.5 shrink-0" />
+                  <p><strong className="text-foreground">Step 5:</strong> Go to <strong className="text-foreground">Board</strong> tab and click <strong className="text-foreground">"Import from Documents"</strong></p>
                 </div>
               </div>
               <p>
-                Once imported, you can create <strong className="text-foreground">sprints</strong>, drag stories between statuses, set priorities, and assign story points — just like Jira.
+                Once imported, create <strong className="text-foreground">sprints</strong>, drag stories, set priorities, and assign points.
               </p>
             </div>
           </div>
 
-          <div className="mt-8 space-y-4" data-testid="section-phases">
-            <h2 className="text-lg font-heading font-semibold text-foreground">The 4 BMad Phases</h2>
-            <p className="text-sm text-muted-foreground">
-              Follow these phases in order. Each command may require documents from previous steps — the app will let you know if prerequisites are missing.
+          <div className="mt-4 space-y-3" data-testid="section-phases">
+            <h2 className="text-sm font-semibold text-foreground">The 4 BMad Phases</h2>
+            <p className="text-xs text-muted-foreground">
+              Follow these phases in order. Each command may require documents from previous steps.
             </p>
 
             {STEPS.map((step, i) => (
               <div
                 key={step.phase}
                 className={cn(
-                  "rounded-xl border p-5",
-                  step.highlight ? "border-primary/30 bg-primary/3" : "border-border bg-white"
+                  "rounded-md border p-4",
+                  step.highlight ? "border-primary/20 bg-primary/3" : "border-border bg-card"
                 )}
                 data-testid={`section-phase-${i + 1}`}
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center", step.color)}>
-                    <step.icon size={18} className={step.iconColor} />
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={cn("w-7 h-7 rounded flex items-center justify-center", step.color)}>
+                    <step.icon size={14} className={step.iconColor} />
                   </div>
                   <div>
-                    <h3 className="font-heading font-semibold text-foreground">{step.phase}</h3>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Users size={10} /> {step.agent}
+                    <h3 className="text-sm font-semibold text-foreground">{step.phase}</h3>
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Users size={9} /> {step.agent}
                     </p>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">{step.description}</p>
-                <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground mb-2">{step.description}</p>
+                <div className="space-y-1">
                   {step.commands.map((cmd) => (
-                    <div key={cmd.trigger} className="flex items-center gap-3 text-sm">
-                      <code className="bg-muted px-2 py-0.5 rounded text-xs font-mono font-semibold text-foreground w-8 text-center shrink-0">
+                    <div key={cmd.trigger} className="flex items-center gap-2 text-xs">
+                      <code className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold text-foreground w-7 text-center shrink-0">
                         {cmd.trigger}
                       </code>
                       <span className="font-medium text-foreground">{cmd.name}</span>
-                      <span className="text-muted-foreground text-xs hidden sm:inline">— {cmd.detail}</span>
+                      <span className="text-muted-foreground text-[10px] hidden sm:inline">— {cmd.detail}</span>
                     </div>
                   ))}
                 </div>
                 {step.highlight && (
-                  <div className="mt-3 flex items-center gap-2 text-xs text-primary font-medium bg-primary/5 px-3 py-2 rounded-lg">
-                    <FolderKanban size={14} />
-                    The CE command here is what generates stories for your Board
+                  <div className="mt-2 flex items-center gap-1.5 text-[10px] text-primary font-medium bg-primary/5 px-2.5 py-1.5 rounded">
+                    <FolderKanban size={11} />
+                    The CE command generates stories for your Board
                   </div>
                 )}
               </div>
             ))}
           </div>
 
-          <div className="mt-8 glass-card p-6 rounded-xl" data-testid="section-board-features">
-            <div className="flex items-center gap-2 mb-3">
-              <FolderKanban size={20} className="text-primary" />
-              <h2 className="text-lg font-heading font-semibold text-foreground">Board Features</h2>
+          <div className="mt-4 bg-card p-5 rounded-md border border-border" data-testid="section-board-features">
+            <div className="flex items-center gap-2 mb-2">
+              <FolderKanban size={14} className="text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">Board Features</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div className="p-3 rounded-lg bg-muted/50">
-                <p className="font-medium text-foreground mb-1">Epics View</p>
-                <p className="text-xs text-muted-foreground">Expandable epic list showing stories grouped under each epic with status and priority badges.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 rounded bg-muted/50 border border-border">
+                <p className="font-medium text-foreground mb-0.5">Epics View</p>
+                <p className="text-[10px] text-muted-foreground">Expandable epic list showing stories grouped under each epic.</p>
               </div>
-              <div className="p-3 rounded-lg bg-muted/50">
-                <p className="font-medium text-foreground mb-1">Kanban Board</p>
-                <p className="text-xs text-muted-foreground">5-column board (Backlog → To Do → In Progress → Review → Done) with story cards.</p>
+              <div className="p-2.5 rounded bg-muted/50 border border-border">
+                <p className="font-medium text-foreground mb-0.5">Kanban Board</p>
+                <p className="text-[10px] text-muted-foreground">5-column board (Backlog, To Do, In Progress, Review, Done).</p>
               </div>
-              <div className="p-3 rounded-lg bg-muted/50">
-                <p className="font-medium text-foreground mb-1">Sprint Management</p>
-                <p className="text-xs text-muted-foreground">Create sprints, assign stories to sprints, and filter the board by sprint.</p>
+              <div className="p-2.5 rounded bg-muted/50 border border-border">
+                <p className="font-medium text-foreground mb-0.5">Sprint Management</p>
+                <p className="text-[10px] text-muted-foreground">Create sprints, assign stories, and filter the board.</p>
               </div>
-              <div className="p-3 rounded-lg bg-muted/50">
-                <p className="font-medium text-foreground mb-1">Story Details</p>
-                <p className="text-xs text-muted-foreground">Click any story to see full description, acceptance criteria, and update status/priority/points.</p>
+              <div className="p-2.5 rounded bg-muted/50 border border-border">
+                <p className="font-medium text-foreground mb-0.5">Story Details</p>
+                <p className="text-[10px] text-muted-foreground">Full description, acceptance criteria, status, priority, and points.</p>
               </div>
             </div>
           </div>
