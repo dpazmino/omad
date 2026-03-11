@@ -12,7 +12,7 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
 
 ## Key Features
 - **Projects**: Central organizing concept — each project has its own sessions, workflows, and phase tracking
-- **7 BMad Agents**: Winston (Architect), John (PM), Mary (Analyst), Sally (UX), Bob (Scrum Master), DevAI (Developer), Quinn (QA)
+- **8 BMad Agents**: Winston (Architect), John (PM), Mary (Analyst), Sally (UX), Bob (Scrum Master), DevAI (Developer), Quinn (QA), Fred (Senior Scrum Master — sprint planning, dependency analysis)
 - **Real-time Chat**: Streaming SSE responses from Claude with agent personas (project-scoped)
 - **Interactive Responses**: Agent responses with questions/choices are parsed into interactive UI (radio buttons for MC, text inputs for open-ended). Located in `client/src/components/InteractiveResponse.tsx`
 - **Party Mode**: All active agents collaborate and respond sequentially
@@ -32,7 +32,9 @@ A web-based implementation of the BMad Method (Build More Architect Dreams), an 
   - Inline create forms for epics, stories, and sprints
   - Import from CE (Create Epics) command output via `parseEpicsFromDocument()`
   - Component: `client/src/components/BoardView.tsx`
-  - API: `/api/projects/:id/epics`, `/api/projects/:id/sprints`, `/api/projects/:id/stories`, `/api/projects/:id/import-epics`
+  - Story dependencies: `stories.dependsOn` integer array column tracks which stories a story depends on. Displayed as badges on story rows/cards, and in the story detail modal with linked story info.
+  - Fred (Senior Scrum Master) chat panel: "Talk to Fred" button opens a slide-out chat within the Board view. Fred analyzes all stories, identifies dependencies and groupings, and recommends sprint assignments. Fred's responses can include a `\`\`\`dependencies` JSON block that the user can save directly to stories via a "Save Dependencies" button.
+  - API: `/api/projects/:id/epics`, `/api/projects/:id/sprints`, `/api/projects/:id/stories`, `/api/projects/:id/import-epics`, `/api/projects/:id/fred-chat` (SSE), `/api/projects/:id/save-dependencies`
 - **Dev View**: Focused screen for in-progress story development. Accessible from ProjectDetail "Dev View" link.
   - Shows all in-progress stories with prompt status
   - Per-story Claude Code prompt editor (saved to `stories.prompt` column)
@@ -76,7 +78,7 @@ server/replit_integrations/  - AI integration modules (chat, audio, image, batch
 - `documents` - Auto-detected project artifacts (title, docType, content, agentName, phase, projectId, sessionId, messageId)
 - `epics` - Project epics (title, description, status, priority, projectId FK)
 - `sprints` - Project sprints (name, goal, status, startDate, endDate, projectId FK)
-- `stories` - User stories (title, description, acceptanceCriteria, status, priority, storyPoints, assignee, prompt, mergedIntoStoryId, epicId FK, sprintId FK nullable, projectId FK)
+- `stories` - User stories (title, description, acceptanceCriteria, status, priority, storyPoints, assignee, prompt, mergedIntoStoryId, dependsOn int[], epicId FK, sprintId FK nullable, projectId FK)
 
 ## Data Model
 - Projects are the top-level entity
@@ -95,7 +97,7 @@ server/replit_integrations/  - AI integration modules (chat, audio, image, batch
 - No user API keys required
 
 ## Fonts
-- Outfit (headings), Inter (body), JetBrains Mono (code)
+- Inter (all text), JetBrains Mono (code)
 
 ## Important Notes
 - `Link` from wouter renders an `<a>` — do NOT wrap it in another `<a>` tag

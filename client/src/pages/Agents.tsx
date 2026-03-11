@@ -13,6 +13,7 @@ const AGENT_COLORS: Record<string, string> = {
   Bob: "bg-amber-700 text-white",
   DevAI: "bg-emerald-700 text-white",
   Quinn: "bg-rose-700 text-white",
+  Fred: "bg-indigo-700 text-white",
 };
 
 export default function Agents() {

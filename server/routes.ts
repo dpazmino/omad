@@ -76,6 +76,14 @@ async function seedAgents() {
       await storage.createAgent(agent);
     }
     console.log(`Seeded ${BMAD_AGENTS.length} BMad agents`);
+  } else {
+    const existingNames = new Set(existing.map(a => a.name));
+    for (const agent of BMAD_AGENTS) {
+      if (!existingNames.has(agent.name)) {
+        await storage.createAgent(agent);
+        console.log(`Seeded new agent: ${agent.name}`);
+      }
+    }
   }
 }
 
@@ -581,6 +589,155 @@ export async function registerRoutes(
   app.delete("/api/stories/:id", async (req, res) => {
     await storage.deleteStory(parseInt(req.params.id));
     res.status(204).end();
+  });
+
+  // ── Fred (Senior Scrum Master) chat — sprint planning with dependency analysis ──
+  app.post("/api/projects/:id/fred-chat", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const { messages: chatHistory } = req.body;
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    try {
+      const allStories = await storage.getStoriesByProject(projectId);
+      const allEpics = await storage.getEpicsByProject(projectId);
+      const allSprints = await storage.getSprintsByProject(projectId);
+
+      const storyContext = allStories
+        .filter(s => !s.mergedIntoStoryId)
+        .map(s => {
+          const epic = allEpics.find(e => e.id === s.epicId);
+          const sprint = allSprints.find(sp => sp.id === s.sprintId);
+          const deps = s.dependsOn && s.dependsOn.length > 0 ? ` | Depends on: [${s.dependsOn.join(", ")}]` : "";
+          return `  - [ID:${s.id}] "${s.title}" (Epic: ${epic?.title || "?"}, Status: ${s.status}, Priority: ${s.priority}, Points: ${s.storyPoints || "?"}, Sprint: ${sprint?.name || "Unassigned"}${deps})`;
+        }).join("\n");
+
+      const epicContext = allEpics.map(e => {
+        const epicStories = allStories.filter(s => s.epicId === e.id && !s.mergedIntoStoryId);
+        return `  - [Epic ID:${e.id}] "${e.title}" — ${epicStories.length} stories, ${epicStories.filter(s => s.status === "done").length} done`;
+      }).join("\n");
+
+      const sprintContext = allSprints.map(sp => {
+        const spStories = allStories.filter(s => s.sprintId === sp.id);
+        return `  - [Sprint ID:${sp.id}] "${sp.name}" (${sp.status}) — ${spStories.length} stories, Goal: ${sp.goal || "none"}`;
+      }).join("\n");
+
+      const systemPrompt = `You are Fred, the Senior Scrum Master in the BMad Method development framework.
+
+Role: Senior Scrum Master + Sprint Planning Strategist
+
+Identity: Veteran Scrum Master with 15+ years leading agile teams across enterprise banking, fintech, and large-scale distributed systems. Expert in dependency analysis, sprint sequencing, and backlog optimization.
+
+Communication Style: Methodical and analytical. Present recommendations with clear reasoning backed by dependency chains and risk assessment. Use structured tables and priority matrices. Direct but collaborative — always explain the 'why' behind every recommendation.
+
+You have access to the project's complete backlog data:
+
+## Epics
+${epicContext || "  (No epics yet)"}
+
+## Stories
+${storyContext || "  (No stories yet)"}
+
+## Sprints
+${sprintContext || "  (No sprints yet)"}
+
+## Your Capabilities
+1. **Sprint Recommendations**: Analyze all stories and recommend which should go into the next sprint based on dependencies, priority, and logical grouping.
+2. **Dependency Analysis**: Identify which stories depend on other stories (e.g., "Story B requires the API from Story A to be built first").
+3. **Story Grouping**: Find stories that should be implemented together because they share components, APIs, or data models.
+4. **Risk Assessment**: Flag stories that are high-risk or likely to cause blockers.
+
+## DEPENDENCY FORMAT
+When you identify dependencies, present them in a structured format. After your analysis, if you recommend dependencies, include a JSON block at the end of your message in this exact format:
+
+\`\`\`dependencies
+[
+  {"storyId": <id>, "dependsOn": [<id>, <id>]},
+  {"storyId": <id>, "dependsOn": [<id>]}
+]
+\`\`\`
+
+This allows the user to save your recommendations directly to the stories.
+
+GUIDELINES:
+- Be CONCISE and professional. Avoid lengthy preambles.
+- Reference stories by their ID and title.
+- Always explain WHY a dependency exists.
+- Group related stories and explain the grouping logic.
+- Recommend sprint assignments based on dependency order.
+- Consider story points when recommending sprint load.`;
+
+      const anthropicMessages = chatHistory.map((m: { role: string; content: string }) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+      const stream = anthropic.messages.stream({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4096,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: anthropicMessages,
+      });
+
+      let fullResponse = "";
+
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          const delta = event.delta.text;
+          fullResponse += delta;
+          res.write(`data: ${JSON.stringify({ type: "content", content: delta })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ type: "done", content: fullResponse })}\n\n`);
+      res.end();
+    } catch (error: any) {
+      console.error("Fred chat error:", error);
+      res.write(`data: ${JSON.stringify({ type: "error", error: error.message || "Fred chat failed" })}\n\n`);
+      res.end();
+    }
+  });
+
+  // ── Save dependency recommendations from Fred ──
+  app.post("/api/projects/:id/save-dependencies", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const { dependencies } = req.body;
+
+    if (!Array.isArray(dependencies)) {
+      return res.status(400).json({ error: "dependencies must be an array" });
+    }
+
+    const projectStories = await storage.getStoriesByProject(projectId);
+    const projectStoryIds = new Set(projectStories.map(s => s.id));
+
+    const results: { storyId: number; updated: boolean; error?: string }[] = [];
+
+    for (const dep of dependencies) {
+      const storyId = typeof dep?.storyId === "number" ? dep.storyId : parseInt(dep?.storyId);
+      if (!storyId || isNaN(storyId)) {
+        results.push({ storyId: dep?.storyId ?? 0, updated: false, error: "Invalid storyId" });
+        continue;
+      }
+      if (!projectStoryIds.has(storyId)) {
+        results.push({ storyId, updated: false, error: "Story not found in project" });
+        continue;
+      }
+      const rawDeps = Array.isArray(dep.dependsOn) ? dep.dependsOn : [];
+      const validDeps = rawDeps
+        .map((id: any) => typeof id === "number" ? id : parseInt(id))
+        .filter((id: number) => !isNaN(id) && projectStoryIds.has(id) && id !== storyId);
+      try {
+        await storage.updateStory(storyId, { dependsOn: validDeps });
+        results.push({ storyId, updated: true });
+      } catch (err: any) {
+        results.push({ storyId, updated: false, error: err.message });
+      }
+    }
+
+    res.json({ saved: results.filter(r => r.updated).length, total: results.length, results });
   });
 
   // ── Generate Claude Code prompt for a story ──
