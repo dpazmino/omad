@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronRight, Plus, Trash2, Edit2, X, Check,
   Target, Zap, AlertTriangle, ArrowUp, ArrowDown, Minus,
   LayoutGrid, List, Import, MessageSquare, Send, Link2, Save, Loader2,
-  ShieldCheck, RefreshCw
+  ShieldCheck, RefreshCw, Wand2, CheckCircle2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -568,7 +568,9 @@ function StoryDetailModal({ story, epics, sprints, stories, onClose, onSave }: {
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [investLoading, setInvestLoading] = useState(false);
+  const [applyLoading, setApplyLoading] = useState(false);
   const [investData, setInvestData] = useState(story.investAnalysis || null);
+  const [storyData, setStoryData] = useState({ title: story.title, description: story.description, acceptanceCriteria: story.acceptanceCriteria });
   const [form, setForm] = useState({
     title: story.title,
     description: story.description,
@@ -621,7 +623,7 @@ function StoryDetailModal({ story, epics, sprints, stories, onClose, onSave }: {
                 className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary/40"
               />
             ) : (
-              <p className="px-3 py-2 text-sm font-medium text-foreground">{form.title}</p>
+              <p className="px-3 py-2 text-sm font-medium text-foreground">{storyData.title}</p>
             )}
           </div>
 
@@ -721,7 +723,7 @@ function StoryDetailModal({ story, epics, sprints, stories, onClose, onSave }: {
               />
             ) : (
               <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm prose prose-sm max-w-none">
-                <ReactMarkdown>{form.description || "No description"}</ReactMarkdown>
+                <ReactMarkdown>{storyData.description || "No description"}</ReactMarkdown>
               </div>
             )}
           </div>
@@ -738,7 +740,7 @@ function StoryDetailModal({ story, epics, sprints, stories, onClose, onSave }: {
               />
             ) : (
               <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm prose prose-sm max-w-none">
-                <ReactMarkdown>{form.acceptanceCriteria || "No acceptance criteria"}</ReactMarkdown>
+                <ReactMarkdown>{storyData.acceptanceCriteria || "No acceptance criteria"}</ReactMarkdown>
               </div>
             )}
           </div>
@@ -831,16 +833,67 @@ function StoryDetailModal({ story, epics, sprints, stories, onClose, onSave }: {
                   </div>
                 )}
 
-                {(investData as any).suggestions && (investData as any).suggestions.length > 0 && (
+                {(investData as any).suggestions && (investData as any).suggestions.length > 0 ? (
                   <div className="px-3 py-2 rounded border border-blue-100 bg-blue-50/50 text-xs" data-testid="invest-suggestions">
-                    <span className="font-medium text-blue-700 block mb-1">Suggestions:</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-blue-700">Suggestions:</span>
+                      <button
+                        data-testid="button-apply-invest"
+                        disabled={applyLoading || investLoading}
+                        onClick={async () => {
+                          setApplyLoading(true);
+                          try {
+                            const res = await fetch(`/api/stories/${story.id}/invest-apply`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                            });
+                            if (!res.ok) throw new Error("Apply failed");
+                            const data = await res.json();
+                            setInvestData(data.analysis);
+                            setStoryData({
+                              title: data.story.title,
+                              description: data.story.description,
+                              acceptanceCriteria: data.story.acceptanceCriteria,
+                            });
+                            setForm(f => ({
+                              ...f,
+                              title: data.story.title,
+                              description: data.story.description,
+                              acceptanceCriteria: data.story.acceptanceCriteria,
+                            }));
+                            onSave();
+                          } catch (e) {
+                            console.error("Apply INVEST error:", e);
+                          } finally {
+                            setApplyLoading(false);
+                          }
+                        }}
+                        className={cn(
+                          "flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors",
+                          applyLoading
+                            ? "bg-blue-100 text-blue-400 cursor-not-allowed"
+                            : "bg-blue-600 text-white hover:bg-blue-700"
+                        )}
+                      >
+                        {applyLoading ? (
+                          <><Loader2 size={10} className="animate-spin" /> Applying...</>
+                        ) : (
+                          <><Wand2 size={10} /> Apply Suggestions</>
+                        )}
+                      </button>
+                    </div>
                     <ul className="list-disc list-inside space-y-0.5 text-blue-800">
                       {(investData as any).suggestions.map((s: string, i: number) => (
                         <li key={i}>{s}</li>
                       ))}
                     </ul>
                   </div>
-                )}
+                ) : investData ? (
+                  <div className="px-3 py-2 rounded border border-emerald-200 bg-emerald-50 text-xs flex items-center gap-2" data-testid="invest-all-pass">
+                    <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                    <span className="text-emerald-700 font-medium">Story passes all INVEST criteria. No further suggestions needed.</span>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="px-3 py-4 rounded border border-dashed border-border bg-muted/20 text-xs text-muted-foreground text-center">

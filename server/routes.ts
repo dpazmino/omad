@@ -670,6 +670,142 @@ ${siblingStories || "(none)"}`;
     }
   });
 
+  // ── Apply INVEST suggestions and re-analyze ──
+  app.post("/api/stories/:id/invest-apply", async (req, res) => {
+    const storyId = parseInt(req.params.id);
+    const story = await storage.getStory(storyId);
+    if (!story) return res.status(404).json({ error: "Story not found" });
+
+    const currentAnalysis = story.investAnalysis as any;
+    if (!currentAnalysis?.suggestions || currentAnalysis.suggestions.length === 0) {
+      return res.status(400).json({ error: "No suggestions to apply" });
+    }
+
+    const epic = await storage.getEpic(story.epicId);
+
+    const rewritePrompt = `You are Allie, the Story Analyst specializing in the INVEST framework.
+
+You previously analyzed this user story and found issues. Now apply the suggestions to improve it.
+
+Return ONLY a JSON object with the improved story fields:
+{
+  "title": "Improved title (or same if fine)",
+  "description": "Improved description incorporating the suggestions",
+  "acceptanceCriteria": "Improved acceptance criteria that are specific and testable"
+}
+
+Rules:
+- Apply ALL suggestions listed below
+- Make the story follow the INVEST framework (Independent, Negotiable, Valuable, Estimable, Small, Testable)
+- Keep the core intent of the story — improve quality, don't change the goal
+- Use "As a [role], I want [action] so that [benefit]" format for the description if not already
+- Make acceptance criteria specific, measurable, and testable (use Given/When/Then or bullet points)
+- Return ONLY the JSON object, no other text`;
+
+    const failingCriteria = Object.entries(currentAnalysis)
+      .filter(([key, val]: [string, any]) => 
+        ["independent","negotiable","valuable","estimable","small","testable"].includes(key) && 
+        val?.score && val.score !== "pass"
+      )
+      .map(([key, val]: [string, any]) => `- ${key.toUpperCase()}: ${val.score} — ${val.notes}`)
+      .join("\n");
+
+    const userMessage = `Current story:
+**Title:** ${story.title}
+**Epic:** ${epic?.title || "Unknown"}
+**Description:** ${story.description || "(none)"}
+**Acceptance Criteria:** ${story.acceptanceCriteria || "(none)"}
+
+**Failing/Warning criteria:**
+${failingCriteria || "(none)"}
+
+**Suggestions to apply:**
+${currentAnalysis.suggestions.map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}`;
+
+    try {
+      const rewriteResponse = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        temperature: 0.1,
+        system: rewritePrompt,
+        messages: [{ role: "user", content: userMessage }],
+      });
+
+      const rewriteText = rewriteResponse.content[0]?.type === "text" ? rewriteResponse.content[0].text : "";
+      const rewriteMatch = rewriteText.match(/\{[\s\S]*\}/);
+      if (!rewriteMatch) {
+        return res.status(500).json({ error: "Failed to parse rewrite response" });
+      }
+
+      const improved = JSON.parse(rewriteMatch[0]);
+      await storage.updateStory(storyId, {
+        title: improved.title || story.title,
+        description: improved.description || story.description,
+        acceptanceCriteria: improved.acceptanceCriteria || story.acceptanceCriteria,
+      });
+
+      const updatedStory = await storage.getStory(storyId);
+      if (!updatedStory) return res.status(500).json({ error: "Story update failed" });
+
+      const allStories = await storage.getStoriesByProject(story.projectId);
+      const siblingStories = allStories
+        .filter(s => s.epicId === story.epicId && s.id !== story.id && !s.mergedIntoStoryId)
+        .map(s => `  - [ID:${s.id}] "${s.title}"`)
+        .join("\n");
+
+      const analyzeResponse = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        temperature: 0.1,
+        system: `You are Allie, the Story Analyst specializing in the INVEST framework (Bill Wake).
+
+Evaluate this user story against all six INVEST criteria. Return your analysis as a JSON object (and ONLY a JSON object, no other text) in this exact format:
+
+{
+  "independent": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "negotiable": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "valuable": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "estimable": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "small": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "testable": { "score": "pass|warn|fail", "notes": "Specific reasoning" },
+  "summary": "One paragraph overall assessment",
+  "suggestions": ["Specific improvement 1", "Specific improvement 2"]
+}
+
+If the story now fully passes all INVEST criteria, set suggestions to an empty array [].
+
+Score meanings:
+- "pass": Fully meets the criterion
+- "warn": Partially meets, minor improvements needed
+- "fail": Does not meet, significant rework needed`,
+        messages: [{
+          role: "user",
+          content: `Evaluate this story:\n\n**Title:** ${updatedStory.title}\n**Epic:** ${epic?.title || "Unknown"}\n**Description:** ${updatedStory.description || "(none)"}\n**Acceptance Criteria:** ${updatedStory.acceptanceCriteria || "(none)"}\n**Priority:** ${updatedStory.priority}\n**Story Points:** ${updatedStory.storyPoints || "Not estimated"}\n\n**Other stories in the same epic:**\n${siblingStories || "(none)"}`
+        }],
+      });
+
+      const analyzeText = analyzeResponse.content[0]?.type === "text" ? analyzeResponse.content[0].text : "";
+      const analyzeMatch = analyzeText.match(/\{[\s\S]*\}/);
+      if (!analyzeMatch) {
+        return res.status(500).json({ error: "Failed to parse re-analysis" });
+      }
+
+      const newAnalysis = JSON.parse(analyzeMatch[0]);
+      await storage.updateStory(storyId, { investAnalysis: newAnalysis });
+
+      res.json({
+        story: {
+          ...updatedStory,
+          investAnalysis: newAnalysis,
+        },
+        analysis: newAnalysis,
+      });
+    } catch (error: any) {
+      console.error("INVEST apply error:", error);
+      res.status(500).json({ error: error.message || "Apply suggestions failed" });
+    }
+  });
+
   // ── Bulk INVEST Analysis for all stories in project ──
   app.post("/api/projects/:id/invest-all", async (req, res) => {
     const projectId = parseInt(req.params.id);
