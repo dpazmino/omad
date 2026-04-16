@@ -1330,7 +1330,7 @@ function parseEpicsFromDocument(content: string): { title: string; description: 
     m = trimmed.match(/^#{3,4}\s+(?:US|Task|Feature)\s*[\-#]?\d*[:\s—–\-]+(.+)/i);
     if (m) return m[1].replace(/\*{1,2}/g, "").trim();
 
-    m = trimmed.match(/^\*\*(?:User\s+)?Story\s*(?:E?\d+[\.\-]?\d*)?[:\s—–\-]+(.+?)\*\*/i);
+    m = trimmed.match(/^\*\*(?:User\s+)?Story\s+E?\d+[\.\-]?\d*\s*[:\s—–\-]+(.+?)\*\*/i);
     if (m) return m[1].replace(/\*{1,2}/g, "").trim();
 
     m = trimmed.match(/^\*\*S\d+[\.\-]\d+[:\s—–\-]+(.+?)\*\*/i);
