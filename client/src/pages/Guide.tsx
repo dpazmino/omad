@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Link } from "wouter";
 import {
   BookOpen, ArrowRight, MessageSquare, FolderKanban,
   Lightbulb, FileText, Layers, CheckCircle2, Users, Code2,
-  Sparkles, ClipboardList, Merge
+  Sparkles, ClipboardList, Merge, Info
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { COMMAND_DETAILS, type CommandDetail } from "@/lib/commandDetails";
+import { CommandDetailModal } from "@/components/CommandDetailModal";
 
 const STEPS = [
   {
@@ -76,6 +79,8 @@ const STEPS = [
 ];
 
 export default function Guide() {
+  const [activeCommand, setActiveCommand] = useState<CommandDetail | null>(null);
+
   return (
     <Layout>
       <div className="flex-1 overflow-auto">
@@ -198,15 +203,25 @@ export default function Guide() {
                 </div>
                 <p className="text-xs text-muted-foreground mb-2">{step.description}</p>
                 <div className="space-y-1">
-                  {step.commands.map((cmd) => (
-                    <div key={cmd.trigger} className="flex items-center gap-2 text-xs">
-                      <code className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold text-foreground w-7 text-center shrink-0">
-                        {cmd.trigger}
-                      </code>
-                      <span className="font-medium text-foreground">{cmd.name}</span>
-                      <span className="text-muted-foreground text-[10px] hidden sm:inline">— {cmd.detail}</span>
-                    </div>
-                  ))}
+                  {step.commands.map((cmd) => {
+                    const detail = COMMAND_DETAILS[cmd.trigger];
+                    return (
+                      <button
+                        key={cmd.trigger}
+                        data-testid={`button-guide-command-${cmd.trigger}`}
+                        onClick={() => detail && setActiveCommand(detail)}
+                        disabled={!detail}
+                        className="w-full flex items-center gap-2 text-xs text-left px-1.5 py-1 rounded hover:bg-primary/5 transition-colors disabled:cursor-default"
+                      >
+                        <code className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold text-foreground w-7 text-center shrink-0">
+                          {cmd.trigger}
+                        </code>
+                        <span className="font-medium text-foreground">{cmd.name}</span>
+                        <span className="text-muted-foreground text-[10px] hidden sm:inline flex-1 truncate">— {cmd.detail}</span>
+                        {detail && <Info size={10} className="text-muted-foreground/60 shrink-0" />}
+                      </button>
+                    );
+                  })}
                 </div>
                 {step.highlight && (
                   <div className="mt-2 flex items-center gap-1.5 text-[10px] text-primary font-medium bg-primary/5 px-2.5 py-1.5 rounded">
