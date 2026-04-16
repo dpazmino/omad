@@ -1011,6 +1011,13 @@ function DocumentsPanel({
   onScan: () => void;
 }) {
   const [scanning, setScanning] = useState(false);
+  const modalScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (viewingDoc && modalScrollRef.current) {
+      modalScrollRef.current.scrollTop = 0;
+    }
+  }, [viewingDoc?.id]);
 
   return (
     <div className="w-80 border-l border-border bg-card flex flex-col shrink-0 hidden lg:flex" data-testid="documents-panel">
@@ -1081,7 +1088,7 @@ function DocumentsPanel({
                 <X size={16} />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6">
+            <div ref={modalScrollRef} className="flex-1 overflow-y-auto p-6">
               <div className="prose prose-sm max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewingDoc.content}</ReactMarkdown>
               </div>
