@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
-import { Plus, FolderKanban, Clock, Trash2, MoreVertical } from "lucide-react";
+import { Plus, FolderKanban, Clock, Trash2, MoreVertical, Github, Loader2, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fetchProjects, createProject, deleteProject, updateProject } from "@/lib/api";
+import { fetchProjects, createProject, deleteProject, updateProject, importGithubProject, GithubImportError } from "@/lib/api";
 import type { Project } from "@shared/schema";
 
 const PHASE_LABELS: Record<string, { label: string; color: string }> = {
@@ -27,6 +27,11 @@ export default function Projects() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [intent, setIntent] = useState("");
+  const [importError, setImportError] = useState<{ message: string; partialProjectId?: number } | null>(null);
+  const [, navigate] = useLocation();
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ["projects"],
@@ -42,6 +47,33 @@ export default function Projects() {
       setNewDescription("");
     },
   });
+
+  const importMutation = useMutation({
+    mutationFn: ({ url, userIntent }: { url: string; userIntent: string }) => importGithubProject(url, userIntent),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setShowImport(false);
+      setRepoUrl("");
+      setIntent("");
+      setImportError(null);
+      navigate(`/projects/${data.project.id}`);
+    },
+    onError: (err: Error) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      if (err instanceof GithubImportError && err.partial && err.projectId) {
+        setImportError({ message: err.message, partialProjectId: err.projectId });
+      } else {
+        setImportError({ message: err.message || "Import failed" });
+      }
+    },
+  });
+
+  const handleImport = (e: React.FormEvent) => {
+    e.preventDefault();
+    setImportError(null);
+    if (!repoUrl.trim()) return;
+    importMutation.mutate({ url: repoUrl.trim(), userIntent: intent.trim() });
+  };
 
   const deleteMutation = useMutation({
     mutationFn: deleteProject,
@@ -66,15 +98,118 @@ export default function Projects() {
               <h1 className="text-xl font-semibold text-foreground" data-testid="text-projects-title">Projects</h1>
               <p className="text-sm text-muted-foreground mt-1">Manage development projects.</p>
             </div>
-            <button
-              data-testid="button-create-project"
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded text-sm font-medium transition-colors"
-            >
-              <Plus size={14} />
-              New Project
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                data-testid="button-import-github"
+                onClick={() => setShowImport(true)}
+                className="flex items-center gap-2 bg-card hover:bg-muted text-foreground px-4 py-2 rounded text-sm font-medium border border-border transition-colors"
+              >
+                <Github size={14} />
+                Import from GitHub
+              </button>
+              <button
+                data-testid="button-create-project"
+                onClick={() => setShowCreate(true)}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded text-sm font-medium transition-colors"
+              >
+                <Plus size={14} />
+                New Project
+              </button>
+            </div>
           </div>
+
+          {showImport && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-6">
+              <div className="bg-card w-full max-w-lg p-6 rounded-md border border-border shadow-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Github size={16} className="text-primary" />
+                  <h2 className="text-base font-semibold text-foreground">Import from GitHub</h2>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">
+                  We'll fetch the repo, then generate the full BMad document set (Brief, PRD, UX, Architecture, Epics &amp; Stories) grounded in the real code. Each document will flag open questions for you to resolve with the agents.
+                </p>
+                <form onSubmit={handleImport} className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground block mb-1">Repository URL</label>
+                    <input
+                      data-testid="input-repo-url"
+                      type="text"
+                      value={repoUrl}
+                      onChange={(e) => setRepoUrl(e.target.value)}
+                      placeholder="https://github.com/owner/repo"
+                      disabled={importMutation.isPending}
+                      className="w-full px-3 py-2 rounded bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-sm font-mono disabled:opacity-60"
+                      autoFocus
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">Public repositories only. Accepts `owner/repo` or full URL.</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground block mb-1">What do you want to change? (optional)</label>
+                    <textarea
+                      data-testid="input-import-intent"
+                      value={intent}
+                      onChange={(e) => setIntent(e.target.value)}
+                      placeholder="e.g. Add multi-tenant support, migrate from REST to GraphQL, introduce audit logging across all services..."
+                      disabled={importMutation.isPending}
+                      className="w-full px-3 py-2 rounded bg-background border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-sm min-h-[96px] resize-none disabled:opacity-60"
+                      rows={4}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">Describing your intent produces sharper epics and story-level file changes.</p>
+                  </div>
+
+                  {importError && (
+                    <div className="text-xs bg-destructive/10 border border-destructive/20 rounded px-3 py-2 space-y-2" data-testid="text-import-error">
+                      <div className="text-destructive">{importError.message}</div>
+                      {importError.partialProjectId && (
+                        <button
+                          type="button"
+                          data-testid="button-open-partial-project"
+                          onClick={() => navigate(`/projects/${importError.partialProjectId}`)}
+                          className="text-primary hover:underline text-xs font-medium"
+                        >
+                          Open partial project →
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {importMutation.isPending && (
+                    <div className="text-xs text-muted-foreground bg-muted/40 border border-border rounded px-3 py-2 flex items-start gap-2" data-testid="text-import-progress">
+                      <Loader2 size={12} className="animate-spin text-primary shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-medium text-foreground">Importing &amp; generating documents…</div>
+                        <div className="mt-0.5">This takes 30–90 seconds. We fetch the repo, then generate 5 documents sequentially, each grounded in the prior ones.</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 justify-end pt-1">
+                    <button
+                      type="button"
+                      data-testid="button-cancel-import"
+                      onClick={() => { if (!importMutation.isPending) { setShowImport(false); setRepoUrl(""); setIntent(""); setImportError(null); } }}
+                      disabled={importMutation.isPending}
+                      className="px-3 py-2 rounded text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      data-testid="button-confirm-import"
+                      disabled={!repoUrl.trim() || importMutation.isPending}
+                      className="px-4 py-2 rounded bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {importMutation.isPending ? (
+                        <><Loader2 size={12} className="animate-spin" /> Importing…</>
+                      ) : (
+                        <><CheckCircle2 size={12} /> Import &amp; Generate</>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           {showCreate && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm">

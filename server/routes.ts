@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { BMAD_AGENTS, buildSystemPrompt } from "./agents";
+import { parseRepoUrl, fetchRepoSnapshot, buildRepoContextBlock, PrivateRepoError, type RepoSnapshot } from "./github";
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
@@ -1275,6 +1276,216 @@ Write ONLY the synthesized prompt — no preamble, no explanation. Format in mar
     }
 
     res.json({ imported: created, message: `Imported ${created.epics} epics and ${created.stories} stories` });
+  });
+
+  // ── Import from GitHub repo ──
+  app.post("/api/projects/import-github", async (req, res) => {
+    const { repoUrl, intent } = req.body || {};
+    if (!repoUrl || typeof repoUrl !== "string") {
+      return res.status(400).json({ error: "repoUrl is required" });
+    }
+    const parsed = parseRepoUrl(repoUrl);
+    if (!parsed) {
+      return res.status(400).json({ error: "Could not parse GitHub URL. Use https://github.com/owner/repo or owner/repo." });
+    }
+
+    let snapshot: RepoSnapshot;
+    try {
+      snapshot = await fetchRepoSnapshot(parsed.owner, parsed.repo);
+    } catch (err: any) {
+      if (err instanceof PrivateRepoError) {
+        return res.status(403).json({ error: err.message });
+      }
+      console.error("[import-github] fetch failed:", err?.message);
+      return res.status(400).json({ error: `Failed to fetch repo: ${err?.message || "unknown error"}` });
+    }
+
+    const intentBlock = (intent && typeof intent === "string" && intent.trim())
+      ? `\n\n## User's Intent for This Work\nThe user wants to introduce the following changes / goals into this codebase:\n${intent.trim()}\n`
+      : `\n\n## User's Intent for This Work\n(Not specified. Infer likely improvement areas from the repository state and README.)\n`;
+
+    const repoContext = buildRepoContextBlock(snapshot) + intentBlock;
+
+    const projectName = snapshot.repo.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    const projectDescription = snapshot.description
+      ? `${snapshot.description} (imported from ${snapshot.owner}/${snapshot.repo})`
+      : `Imported from ${snapshot.owner}/${snapshot.repo}`;
+
+    const project = await storage.createProject({
+      name: projectName,
+      description: projectDescription,
+      status: "active",
+      phase: "analysis",
+    });
+
+    const DOC_PLAN: { docType: string; title: string; phase: string; agentName: string; instruction: string }[] = [
+      {
+        docType: "product-brief",
+        title: "Product Brief",
+        phase: "analysis",
+        agentName: "Mary",
+        instruction: `Produce a Product Brief for the work the user wants to do on this repository.
+Structure the document with clear markdown headings:
+# Product Brief — <project name>
+## Vision & Problem
+## Target Users
+## Current State of the Codebase (based on repo)
+## Proposed Changes (based on user intent)
+## Success Metrics
+## Risks & Constraints
+## Issues Detected & Open Questions
+In the final section, list every gap, ambiguity, or missing piece of information you could not confidently derive from the repository or user intent. Number each issue and phrase it as a question the user should answer.`,
+      },
+      {
+        docType: "prd",
+        title: "Product Requirements Document",
+        phase: "planning",
+        agentName: "John",
+        instruction: `Produce a Product Requirements Document (PRD) grounded in both the repository and the Product Brief.
+Structure:
+# Product Requirements Document — <project name>
+## Overview
+## Goals & Non-Goals
+## Functional Requirements
+## Non-Functional Requirements
+## User Flows
+## Dependencies on Existing Code (reference concrete files/modules from the repo)
+## Out of Scope
+## Issues Detected & Open Questions
+In the last section, list numbered open questions the user must resolve before implementation.`,
+      },
+      {
+        docType: "ux-design",
+        title: "UX Design",
+        phase: "planning",
+        agentName: "Sally",
+        instruction: `Produce a UX Design document.
+Structure:
+# UX Design — <project name>
+## User Personas
+## Key User Journeys
+## Screen Inventory (and which existing UI files, if any, are affected)
+## Interaction & Accessibility Notes
+## Issues Detected & Open Questions
+If the repository does not appear to have a UI surface, say so explicitly in the Overview and focus the doc on API ergonomics or CLI UX instead.`,
+      },
+      {
+        docType: "architecture",
+        title: "Architecture Document",
+        phase: "solutioning",
+        agentName: "Winston",
+        instruction: `Produce an Architecture Document that reflects the ACTUAL repository structure plus the changes needed.
+Structure:
+# Architecture — <project name>
+## Current Architecture (summarize what exists, citing real paths from the file tree)
+## Proposed Changes (what modules/files change, what new modules are added)
+## Data Model Changes
+## Integration Points & External Dependencies
+## Migration / Rollout Plan
+## Issues Detected & Open Questions
+Always reference concrete file paths that exist in the repo when talking about current code. Do not invent file paths.`,
+      },
+      {
+        docType: "epic",
+        title: "Epics & Stories",
+        phase: "solutioning",
+        agentName: "John",
+        instruction: `Produce an Epics & Stories document for implementing the changes. This document will be parsed by an importer, so follow the exact format:
+
+# Epics & Stories — <project name>
+
+## E1 — <Epic Title>
+<1–3 sentence description of the epic>
+
+### Story E1.1: <Story Title>
+**Description:** <what needs to happen>
+**Files to Change:** <bullet list or comma-separated list of concrete file paths from the repository that will be modified or created. Use real paths from the file tree.>
+**Acceptance Criteria:**
+- <criterion 1>
+- <criterion 2>
+**Priority:** critical | high | medium | low
+**Story Points:** <integer>
+
+### Story E1.2: ...
+
+## E2 — <next epic>
+...
+
+Produce 3–6 epics, each with 2–5 stories. Every story MUST include a "Files to Change" bullet list with real file paths drawn from the repository tree. If a brand-new file is needed, name it with a realistic path that fits the project's conventions.
+
+After all epics and stories, add a final section:
+## Issues Detected & Open Questions
+List numbered questions the user should resolve (ambiguous requirements, missing dependencies, untested assumptions, etc.).`,
+      },
+    ];
+
+    const generatedDocs: { title: string; docType: string }[] = [];
+    const priorDocs: { title: string; content: string }[] = [];
+
+    try {
+      for (const step of DOC_PLAN) {
+        const priorSection = priorDocs.length
+          ? `\n\n## Prior Documents In This Project\n` +
+            priorDocs.map((d) => `### ${d.title}\n${d.content}`).join("\n\n---\n\n")
+          : "";
+
+        const userPrompt = `${repoContext}${priorSection}\n\n---\n\n## Your Task\n${step.instruction}\n\nReturn ONLY the markdown document. Do not wrap it in code fences. Do not add preamble or closing remarks.`;
+
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-6",
+          max_tokens: 6000,
+          temperature: 0.1,
+          system: `You are a senior member of a BMad Method delivery team (${step.agentName}). You are producing the "${step.title}" for a project that imports an existing GitHub repository. Ground every claim about existing code in the provided repository snapshot — never invent files or APIs that are not in the snapshot. When you are uncertain, put the uncertainty in the "Issues Detected & Open Questions" section rather than guessing.`,
+          messages: [{ role: "user", content: userPrompt }],
+        });
+
+        const textBlocks = response.content.filter((b) => b.type === "text") as { type: "text"; text: string }[];
+        const content = textBlocks.map((b) => b.text).join("\n").trim();
+        if (!content) {
+          throw new Error(`Model returned empty output for "${step.title}". Aborting import.`);
+        }
+
+        await storage.createDocument({
+          projectId: project.id,
+          sessionId: null,
+          messageId: null,
+          title: step.title,
+          docType: step.docType,
+          content,
+          agentName: step.agentName,
+          phase: step.phase,
+        });
+
+        generatedDocs.push({ title: step.title, docType: step.docType });
+        priorDocs.push({ title: step.title, content });
+      }
+    } catch (err: any) {
+      console.error("[import-github] doc generation failed:", err?.message);
+      return res.status(500).json({
+        error: `Generated ${generatedDocs.length} of ${DOC_PLAN.length} documents before failure: ${err?.message || "unknown error"}`,
+        partial: true,
+        project,
+        projectId: project.id,
+        generated: generatedDocs,
+      });
+    }
+
+    if (generatedDocs.length !== DOC_PLAN.length) {
+      return res.status(500).json({
+        error: `Expected ${DOC_PLAN.length} documents but only ${generatedDocs.length} were created.`,
+        partial: true,
+        project,
+        projectId: project.id,
+        generated: generatedDocs,
+      });
+    }
+
+    res.status(201).json({
+      project,
+      repo: { owner: snapshot.owner, repo: snapshot.repo, url: snapshot.url, defaultBranch: snapshot.defaultBranch },
+      generated: generatedDocs,
+      message: `Created project "${project.name}" with ${generatedDocs.length} documents. Review each document and resolve the flagged issues with the agents.`,
+    });
   });
 
   return httpServer;

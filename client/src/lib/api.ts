@@ -44,6 +44,41 @@ export async function fetchMessages(sessionId: number): Promise<ChatMessage[]> {
   return res.json();
 }
 
+export class GithubImportError extends Error {
+  partial: boolean;
+  projectId?: number;
+  generated: { title: string; docType: string }[];
+  constructor(message: string, opts: { partial?: boolean; projectId?: number; generated?: { title: string; docType: string }[] } = {}) {
+    super(message);
+    this.name = "GithubImportError";
+    this.partial = !!opts.partial;
+    this.projectId = opts.projectId;
+    this.generated = opts.generated || [];
+  }
+}
+
+export async function importGithubProject(repoUrl: string, intent?: string): Promise<{
+  project: Project;
+  repo: { owner: string; repo: string; url: string; defaultBranch: string };
+  generated: { title: string; docType: string }[];
+  message: string;
+}> {
+  const res = await fetch(`${API}/projects/import-github`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repoUrl, intent }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new GithubImportError(data.error || "Failed to import repository", {
+      partial: data.partial,
+      projectId: data.projectId,
+      generated: data.generated,
+    });
+  }
+  return data;
+}
+
 export async function fetchProjectSessions(projectId: number): Promise<Session[]> {
   const res = await fetch(`${API}/projects/${projectId}/sessions`);
   if (!res.ok) throw new Error("Failed to fetch project sessions");
