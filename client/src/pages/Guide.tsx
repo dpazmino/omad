@@ -2,7 +2,8 @@ import { Layout } from "@/components/layout/Layout";
 import { Link } from "wouter";
 import {
   BookOpen, ArrowRight, MessageSquare, FolderKanban,
-  Lightbulb, FileText, Layers, CheckCircle2, Users
+  Lightbulb, FileText, Layers, CheckCircle2, Users, Code2,
+  Sparkles, ClipboardList, Merge
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +13,7 @@ const STEPS = [
     color: "bg-blue-50 border-blue-200 text-blue-800",
     icon: Lightbulb,
     iconColor: "text-blue-600",
-    description: "Start by brainstorming and researching your product idea.",
+    description: "Explore your idea and produce a structured product brief.",
     agent: "Mary (Business Analyst)",
     commands: [
       { trigger: "BP", name: "Brainstorm Project", detail: "Interactive brainstorming to explore your idea" },
@@ -25,7 +26,7 @@ const STEPS = [
     color: "bg-emerald-50 border-emerald-200 text-emerald-800",
     icon: FileText,
     iconColor: "text-emerald-600",
-    description: "Define your product requirements and user experience.",
+    description: "Define product requirements and user experience.",
     agent: "John (Product Manager) & Sally (UX Designer)",
     commands: [
       { trigger: "CP", name: "Create PRD", detail: "Guided interview to produce your Product Requirements Document" },
@@ -38,7 +39,7 @@ const STEPS = [
     color: "bg-violet-50 border-violet-200 text-violet-800",
     icon: Layers,
     iconColor: "text-violet-600",
-    description: "Define architecture, then generate your epics and stories for the Board.",
+    description: "Define architecture, then generate epics and stories for the Board.",
     agent: "Winston (Architect) & John (Product Manager)",
     commands: [
       { trigger: "CA", name: "Create Architecture", detail: "Document technical architecture decisions" },
@@ -48,16 +49,28 @@ const STEPS = [
     highlight: true,
   },
   {
-    phase: "4. Implementation",
-    color: "bg-amber-50 border-amber-200 text-amber-800",
+    phase: "4. Refinement",
+    color: "bg-pink-50 border-pink-200 text-pink-800",
     icon: CheckCircle2,
+    iconColor: "text-pink-600",
+    description: "Sharpen the backlog with dependency mapping and INVEST quality checks.",
+    agent: "Fred (Sprint Planner) & Allie (Story Coach)",
+    commands: [
+      { trigger: "FD", name: "Find Dependencies", detail: "Fred maps cross-story dependencies and sequencing" },
+      { trigger: "IN", name: "INVEST Review", detail: "Allie scores stories against the INVEST framework" },
+      { trigger: "SP", name: "Sprint Planning", detail: "Fred builds sprints from the refined backlog" },
+    ],
+  },
+  {
+    phase: "5. Implementation",
+    color: "bg-amber-50 border-amber-200 text-amber-800",
+    icon: Code2,
     iconColor: "text-amber-600",
-    description: "Plan sprints, prepare stories, and track development work on the Board.",
+    description: "Move stories to In Progress and generate implementation prompts in the Dev View.",
     agent: "Bob (Scrum Master) & DevAI (Developer)",
     commands: [
-      { trigger: "SP", name: "Sprint Planning", detail: "Create sprints and assign stories from your Board" },
       { trigger: "CS", name: "Context Story", detail: "Prepare a story with full implementation context" },
-      { trigger: "DS", name: "Dev Story", detail: "Write tests and code for a specific story" },
+      { trigger: "DS", name: "Dev Story", detail: "Write tests and code outline for a specific story" },
     ],
   },
 ];
@@ -148,19 +161,19 @@ export default function Guide() {
                 </div>
                 <div className="flex items-start gap-1.5">
                   <ArrowRight size={10} className="text-primary mt-0.5 shrink-0" />
-                  <p><strong className="text-foreground">Step 5:</strong> Go to <strong className="text-foreground">Board</strong> tab and click <strong className="text-foreground">"Import from Documents"</strong></p>
+                  <p><strong className="text-foreground">Step 5:</strong> Go to the <strong className="text-foreground">Board</strong> tab and click <strong className="text-foreground">"Import from Documents"</strong>. Re-importing clears old stories and brings in the latest.</p>
                 </div>
               </div>
               <p>
-                Once imported, create <strong className="text-foreground">sprints</strong>, drag stories, set priorities, and assign points.
+                Once imported, use <code className="bg-muted px-1 py-0.5 rounded text-[10px]">FD</code> and <code className="bg-muted px-1 py-0.5 rounded text-[10px]">IN</code> to refine the backlog, then create <strong className="text-foreground">sprints</strong> and move stories into <strong className="text-foreground">In Progress</strong> to work them in the Dev View.
               </p>
             </div>
           </div>
 
           <div className="mt-4 space-y-3" data-testid="section-phases">
-            <h2 className="text-sm font-semibold text-foreground">The 4 BMad Phases</h2>
+            <h2 className="text-sm font-semibold text-foreground">The 5 BMad Phases</h2>
             <p className="text-xs text-muted-foreground">
-              Follow these phases in order. Each command may require documents from previous steps.
+              Follow these phases in order. Each command builds on documents from previous steps.
             </p>
 
             {STEPS.map((step, i) => (
@@ -205,6 +218,81 @@ export default function Guide() {
             ))}
           </div>
 
+          <div className="mt-4 bg-card p-5 rounded-md border border-border" data-testid="section-refinement-agents">
+            <div className="flex items-center gap-2 mb-2">
+              <Users size={14} className="text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">Refinement Agents: Fred & Allie</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="p-3 rounded bg-muted/50 border border-border">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-5 h-5 rounded-full bg-indigo-700 text-white text-[10px] font-semibold flex items-center justify-center">F</div>
+                  <p className="font-medium text-foreground">Fred — Sprint Planning</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Maps dependencies between stories, flags blockers, and builds balanced sprints from the backlog.
+                </p>
+              </div>
+              <div className="p-3 rounded bg-muted/50 border border-border">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-5 h-5 rounded-full bg-pink-700 text-white text-[10px] font-semibold flex items-center justify-center">A</div>
+                  <p className="font-medium text-foreground">Allie — Story Coach</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Scores each story against the INVEST framework (Independent, Negotiable, Valuable, Estimable, Small, Testable) and suggests rewrites.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 bg-card p-5 rounded-md border border-border" data-testid="section-dev-view">
+            <div className="flex items-center gap-2 mb-2">
+              <Code2 size={14} className="text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">Dev View</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Dev View is where in-progress stories get implementation briefs. Open it from the tabs inside a project, or move any story to <strong className="text-foreground">In Progress</strong> on the Board to surface it here.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="p-3 rounded bg-muted/50 border border-border">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Sparkles size={11} className="text-primary" />
+                  <p className="font-medium text-foreground">Generate Prompt</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Produces a detailed implementation brief for a single story — context, approach, and gotchas. Not code; a task brief you hand to a developer or coding AI.
+                </p>
+              </div>
+              <div className="p-3 rounded bg-muted/50 border border-border">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <ClipboardList size={11} className="text-primary" />
+                  <p className="font-medium text-foreground">Aggregate Prompts</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Synthesizes several story prompts into one coherent brief, respecting dependencies — good for handing off a batch of related work at once.
+                </p>
+              </div>
+              <div className="p-3 rounded bg-muted/50 border border-border">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Merge size={11} className="text-primary" />
+                  <p className="font-medium text-foreground">Duplicates</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Finds overlapping stories so you can merge them before generating prompts.
+                </p>
+              </div>
+              <div className="p-3 rounded bg-muted/50 border border-border">
+                <p className="font-medium text-foreground mb-0.5">Priority Icons</p>
+                <p className="text-[10px] text-muted-foreground">
+                  <span className="text-red-500">▲</span> critical,
+                  <span className="text-orange-500"> ↑</span> high,
+                  <span className="text-yellow-600"> –</span> medium,
+                  <span className="text-blue-500"> ↓</span> low.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="mt-4 bg-card p-5 rounded-md border border-border" data-testid="section-board-features">
             <div className="flex items-center gap-2 mb-2">
               <FolderKanban size={14} className="text-primary" />
@@ -221,11 +309,19 @@ export default function Guide() {
               </div>
               <div className="p-2.5 rounded bg-muted/50 border border-border">
                 <p className="font-medium text-foreground mb-0.5">Sprint Management</p>
-                <p className="text-[10px] text-muted-foreground">Create sprints, assign stories, and filter the board.</p>
+                <p className="text-[10px] text-muted-foreground">Create sprints, assign stories, and filter the board by sprint.</p>
+              </div>
+              <div className="p-2.5 rounded bg-muted/50 border border-border">
+                <p className="font-medium text-foreground mb-0.5">Import from Documents</p>
+                <p className="text-[10px] text-muted-foreground">Parses the CE document into epics and stories. Re-importing clears the old set and brings in the latest.</p>
               </div>
               <div className="p-2.5 rounded bg-muted/50 border border-border">
                 <p className="font-medium text-foreground mb-0.5">Story Details</p>
-                <p className="text-[10px] text-muted-foreground">Full description, acceptance criteria, status, priority, and points.</p>
+                <p className="text-[10px] text-muted-foreground">Description, acceptance criteria, status, priority, points, and dependencies.</p>
+              </div>
+              <div className="p-2.5 rounded bg-muted/50 border border-border">
+                <p className="font-medium text-foreground mb-0.5">Documents Panel</p>
+                <p className="text-[10px] text-muted-foreground">Side panel with all generated docs — Brief, PRD, UX, Architecture, Epics. Auto-scrolls to top when switching docs.</p>
               </div>
             </div>
           </div>
