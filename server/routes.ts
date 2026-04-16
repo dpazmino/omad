@@ -10,6 +10,68 @@ const anthropic = new Anthropic({
   baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
 });
 
+async function buildPortfolioContext(): Promise<string> {
+  const projects = await storage.getProjects();
+  if (projects.length === 0) {
+    return `\n\n## PORTFOLIO CONTEXT\nThere are no projects in the system yet. Invite the user to create one from the Projects page.`;
+  }
+
+  const lines: string[] = [];
+  lines.push(`\n\n## PORTFOLIO CONTEXT (all ${projects.length} project(s) in this workspace)`);
+  lines.push(`You are NOT inside a single project. The user is asking about the entire portfolio. Use the data below to answer cross-project questions such as "which projects are similar", "which stories overlap", "what epics appear in multiple projects", etc. Always cite project names when referring to specific items. Do not invent projects, epics, or stories that are not in this list.\n`);
+
+  for (const project of projects) {
+    const [docs, epics, stories] = await Promise.all([
+      storage.getDocumentsByProject(project.id),
+      storage.getEpicsByProject(project.id),
+      storage.getStoriesByProject(project.id),
+    ]);
+
+    lines.push(`### Project: ${project.name} (id=${project.id})`);
+    lines.push(`- Phase: ${project.phase} | Status: ${project.status}`);
+    if (project.description) lines.push(`- Description: ${project.description}`);
+
+    if (docs.length) {
+      lines.push(`- Documents (${docs.length}):`);
+      for (const d of docs) {
+        const preview = d.content.replace(/\s+/g, " ").slice(0, 220);
+        lines.push(`  - [${d.docType}] ${d.title} — ${preview}${d.content.length > 220 ? "…" : ""}`);
+      }
+    }
+
+    if (epics.length) {
+      lines.push(`- Epics (${epics.length}):`);
+      for (const e of epics) {
+        const storiesForEpic = stories.filter(s => s.epicId === e.id);
+        const desc = e.description ? ` — ${e.description.replace(/\s+/g, " ").slice(0, 140)}` : "";
+        lines.push(`  - E${e.id}: ${e.title} [${e.status}, ${e.priority}]${desc}`);
+        for (const s of storiesForEpic.slice(0, 8)) {
+          const sDesc = s.description ? ` — ${s.description.replace(/\s+/g, " ").slice(0, 120)}` : "";
+          lines.push(`    - S${s.id}: ${s.title} [${s.status}, ${s.priority}${s.storyPoints ? `, ${s.storyPoints}pt` : ""}]${sDesc}`);
+        }
+        if (storiesForEpic.length > 8) lines.push(`    - …and ${storiesForEpic.length - 8} more stor${storiesForEpic.length - 8 === 1 ? "y" : "ies"}`);
+      }
+    }
+
+    const orphanStories = stories.filter(s => !epics.some(e => e.id === s.epicId));
+    if (orphanStories.length) {
+      lines.push(`- Unlinked stories (${orphanStories.length}):`);
+      for (const s of orphanStories.slice(0, 6)) {
+        lines.push(`  - S${s.id}: ${s.title} [${s.status}]`);
+      }
+    }
+
+    lines.push("");
+  }
+
+  lines.push(`## CROSS-PROJECT GUIDANCE`);
+  lines.push(`- When asked about similarity, compare on: stated goals (brief/PRD), domain/industry, epic themes, and story titles/descriptions.`);
+  lines.push(`- When grouping similar stories, cite each story as "ProjectName: StoryTitle" and explain the overlap in one sentence.`);
+  lines.push(`- If the user asks a question that belongs inside a single project (e.g. "edit story 5"), tell them to open the project from the Projects page.`);
+
+  return lines.join("\n");
+}
+
 const H = `^#+\\s+(?:[^\\n]*?\\s)?`;
 const DOCUMENT_PATTERNS: { pattern: RegExp; docType: string; title: string }[] = [
   { pattern: new RegExp(`${H}product\\s+brief`, "im"), docType: "product-brief", title: "Product Brief" },
@@ -181,7 +243,10 @@ export async function registerRoutes(
       });
 
       const history = await storage.getMessages(sessionId);
-      const systemPrompt = buildSystemPrompt(agent, session.partyMode);
+      let systemPrompt = buildSystemPrompt(agent, session.partyMode);
+      if (!session.projectId) {
+        systemPrompt += await buildPortfolioContext();
+      }
       const chatMessages: { role: "user" | "assistant"; content: string }[] = history.map(m => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -288,6 +353,7 @@ export async function registerRoutes(
       res.write(`data: ${JSON.stringify({ type: "user_message", message: userMsg })}\n\n`);
 
       const history = await storage.getMessages(sessionId);
+      const portfolioContext = session.projectId ? "" : await buildPortfolioContext();
       const baseHistory = history.map(m => ({
         role: m.role as "user" | "assistant",
         content: m.agentName ? `[${m.agentName}]: ${m.content}` : m.content,
@@ -297,7 +363,7 @@ export async function registerRoutes(
       for (const agent of partyAgents) {
         res.write(`data: ${JSON.stringify({ type: "agent_start", agentId: agent.id, agentName: `${agent.name} (${agent.title})` })}\n\n`);
 
-        const partySystemPrompt = buildSystemPrompt(agent, true);
+        const partySystemPrompt = buildSystemPrompt(agent, true) + portfolioContext;
 
         let agentStream;
         try {

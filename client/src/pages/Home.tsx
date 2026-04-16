@@ -1,12 +1,21 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout/Layout";
-import { Send, User, Command, Plus, Loader2, Users } from "lucide-react";
+import { Send, User, Command, Plus, Loader2, Users, FolderKanban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchAgents, fetchMessages, fetchSessions, createSession, streamChat, type StreamEvent } from "@/lib/api";
 import type { Agent, ChatMessage, Session } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+const PORTFOLIO_PROMPTS = [
+  "Which of my projects are the most similar, and why?",
+  "Find user stories that appear in multiple projects.",
+  "Which epics overlap across projects?",
+  "Summarize every project in one sentence.",
+  "Which projects are furthest behind and what's blocking them?",
+  "Which projects could share a common set of components or services?",
+];
 
 export default function Home() {
   const queryClient = useQueryClient();
@@ -22,6 +31,13 @@ export default function Home() {
 
   const { data: agents = [] } = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
   const { data: sessions = [] } = useQuery({ queryKey: ["sessions"], queryFn: fetchSessions });
+  const { data: projects = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["projects"],
+    queryFn: async () => {
+      const r = await fetch("/api/projects");
+      return r.ok ? r.json() : [];
+    },
+  });
   const { data: messages = [] } = useQuery({
     queryKey: ["messages", activeSessionId],
     queryFn: () => (activeSessionId ? fetchMessages(activeSessionId) : Promise.resolve([])),
@@ -195,26 +211,36 @@ export default function Home() {
           {messages.length === 0 && !isStreaming && (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="w-10 h-10 rounded bg-primary flex items-center justify-center mb-3">
-                <Users size={20} className="text-white" />
+                <FolderKanban size={20} className="text-white" />
               </div>
-              <h2 className="text-lg font-semibold mb-1 text-foreground">BMad Method</h2>
-              <p className="text-sm text-muted-foreground max-w-sm mb-5">
-                {activeAgent
-                  ? `${activeAgent.name} (${activeAgent.title}) is ready.`
-                  : "Start a conversation with your AI development team."}
+              <h2 className="text-lg font-semibold mb-1 text-foreground" data-testid="text-portfolio-title">
+                Portfolio Chat
+              </h2>
+              <p className="text-sm text-muted-foreground max-w-md mb-2">
+                Talk to the BMad team about <span className="font-medium text-foreground">all {projects.length} project{projects.length === 1 ? "" : "s"}</span> in this workspace. Ask cross-project questions — similarities, overlaps, shared epics, duplicate stories.
               </p>
-              <div className="flex flex-wrap gap-1.5 justify-center max-w-lg">
-                {activeAgent?.menuCommands?.map((cmd: any) => (
+              <p className="text-[11px] text-muted-foreground mb-5">
+                For work inside a specific project, open it from <span className="font-medium text-foreground">Projects</span>.
+              </p>
+
+              <div className="flex flex-wrap gap-1.5 justify-center max-w-2xl" data-testid="portfolio-suggestions">
+                {PORTFOLIO_PROMPTS.map((prompt) => (
                   <button
-                    key={cmd.trigger}
-                    data-testid={`button-command-${cmd.trigger}`}
-                    onClick={() => setInput(cmd.trigger)}
-                    className="px-2.5 py-1 text-xs bg-muted hover:bg-border border border-border rounded text-muted-foreground hover:text-foreground transition-colors"
+                    key={prompt}
+                    data-testid={`button-prompt-${prompt.slice(0, 20).replace(/\s+/g, "-").toLowerCase()}`}
+                    onClick={() => setInput(prompt)}
+                    className="px-2.5 py-1.5 text-xs bg-muted hover:bg-border border border-border rounded text-muted-foreground hover:text-foreground transition-colors text-left"
                   >
-                    {cmd.description}
+                    {prompt}
                   </button>
                 ))}
               </div>
+
+              {projects.length === 0 && (
+                <div className="mt-5 text-xs text-muted-foreground bg-muted/40 border border-border rounded px-3 py-2 max-w-md">
+                  No projects yet. Create one from the Projects page, or import a GitHub repo, then come back here to compare across them.
+                </div>
+              )}
             </div>
           )}
 
