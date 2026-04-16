@@ -302,7 +302,9 @@ function EpicListView({ epics, stories, sprints, expandedEpics, onToggleEpic, ep
                   </span>
                 </div>
                 {epic.description && (
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{epic.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {epic.description.replace(/\*\*/g, "").replace(/^---+$/gm, "").replace(/\s+/g, " ").trim()}
+                  </p>
                 )}
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
