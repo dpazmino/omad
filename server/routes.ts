@@ -1345,6 +1345,19 @@ Write ONLY the synthesized prompt — no preamble, no explanation. Format in mar
   });
 
   // ── Import from GitHub repo ──
+  app.get("/api/projects/:id/import-status", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid project id" });
+    const project = await storage.getProject(id);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+    const docs = await storage.getDocumentsByProject(id);
+    return res.json({
+      projectId: project.id,
+      importStatus: project.importStatus || null,
+      documentsCreated: docs.map((d) => ({ id: d.id, title: d.title, docType: d.docType })),
+    });
+  });
+
   app.post("/api/projects/import-github", async (req, res) => {
     const { repoUrl, intent } = req.body || {};
     if (!repoUrl || typeof repoUrl !== "string") {
@@ -1382,6 +1395,13 @@ Write ONLY the synthesized prompt — no preamble, no explanation. Format in mar
       description: projectDescription,
       status: "active",
       phase: "analysis",
+      importStatus: {
+        state: "pending",
+        source: `${snapshot.owner}/${snapshot.repo}`,
+        completedSteps: [],
+        totalSteps: 5,
+        startedAt: new Date().toISOString(),
+      },
     });
 
     const DOC_PLAN: { docType: string; title: string; phase: string; agentName: string; instruction: string }[] = [
@@ -1485,72 +1505,120 @@ List numbered questions the user should resolve (ambiguous requirements, missing
       },
     ];
 
-    const generatedDocs: { title: string; docType: string }[] = [];
-    const priorDocs: { title: string; content: string }[] = [];
+    // Respond immediately so the deployment proxy doesn't time out the long-running generation.
+    res.status(202).json({
+      project,
+      projectId: project.id,
+      repo: { owner: snapshot.owner, repo: snapshot.repo, url: snapshot.url, defaultBranch: snapshot.defaultBranch },
+      totalSteps: DOC_PLAN.length,
+      message: "Import started. Poll /api/projects/:id/import-status for progress.",
+    });
 
-    try {
-      for (const step of DOC_PLAN) {
-        const priorSection = priorDocs.length
-          ? `\n\n## Prior Documents In This Project\n` +
-            priorDocs.map((d) => `### ${d.title}\n${d.content}`).join("\n\n---\n\n")
-          : "";
+    // Run document generation in the background.
+    (async () => {
+      const generatedDocs: { title: string; docType: string }[] = [];
+      const priorDocs: { title: string; content: string }[] = [];
+      const completedSteps: string[] = [];
 
-        const userPrompt = `${repoContext}${priorSection}\n\n---\n\n## Your Task\n${step.instruction}\n\nReturn ONLY the markdown document. Do not wrap it in code fences. Do not add preamble or closing remarks.`;
+      await storage.updateProject(project.id, {
+        importStatus: {
+          state: "running",
+          source: `${snapshot.owner}/${snapshot.repo}`,
+          completedSteps: [],
+          totalSteps: DOC_PLAN.length,
+          currentStep: DOC_PLAN[0].title,
+          startedAt: project.importStatus?.startedAt ?? new Date().toISOString(),
+        },
+      });
 
-        const response = await anthropic.messages.create({
-          model: "claude-sonnet-4-6",
-          max_tokens: 6000,
-          temperature: 0.1,
-          system: `You are a senior member of a BMad Method delivery team (${step.agentName}). You are producing the "${step.title}" for a project that imports an existing GitHub repository. Ground every claim about existing code in the provided repository snapshot — never invent files or APIs that are not in the snapshot. When you are uncertain, put the uncertainty in the "Issues Detected & Open Questions" section rather than guessing.`,
-          messages: [{ role: "user", content: userPrompt }],
-        });
+      try {
+        for (const step of DOC_PLAN) {
+          await storage.updateProject(project.id, {
+            importStatus: {
+              state: "running",
+              source: `${snapshot.owner}/${snapshot.repo}`,
+              completedSteps: [...completedSteps],
+              totalSteps: DOC_PLAN.length,
+              currentStep: step.title,
+              startedAt: project.importStatus?.startedAt ?? new Date().toISOString(),
+            },
+          });
 
-        const textBlocks = response.content.filter((b) => b.type === "text") as { type: "text"; text: string }[];
-        const content = textBlocks.map((b) => b.text).join("\n").trim();
-        if (!content) {
-          throw new Error(`Model returned empty output for "${step.title}". Aborting import.`);
+          const priorSection = priorDocs.length
+            ? `\n\n## Prior Documents In This Project\n` +
+              priorDocs.map((d) => `### ${d.title}\n${d.content}`).join("\n\n---\n\n")
+            : "";
+
+          const userPrompt = `${repoContext}${priorSection}\n\n---\n\n## Your Task\n${step.instruction}\n\nReturn ONLY the markdown document. Do not wrap it in code fences. Do not add preamble or closing remarks.`;
+
+          const response = await anthropic.messages.create({
+            model: "claude-sonnet-4-6",
+            max_tokens: 6000,
+            temperature: 0.1,
+            system: `You are a senior member of a BMad Method delivery team (${step.agentName}). You are producing the "${step.title}" for a project that imports an existing GitHub repository. Ground every claim about existing code in the provided repository snapshot — never invent files or APIs that are not in the snapshot. When you are uncertain, put the uncertainty in the "Issues Detected & Open Questions" section rather than guessing.`,
+            messages: [{ role: "user", content: userPrompt }],
+          });
+
+          const textBlocks = response.content.filter((b) => b.type === "text") as { type: "text"; text: string }[];
+          const content = textBlocks.map((b) => b.text).join("\n").trim();
+          if (!content) {
+            throw new Error(`Model returned empty output for "${step.title}". Aborting import.`);
+          }
+
+          await storage.createDocument({
+            projectId: project.id,
+            sessionId: null,
+            messageId: null,
+            title: step.title,
+            docType: step.docType,
+            content,
+            agentName: step.agentName,
+            phase: step.phase,
+          });
+
+          generatedDocs.push({ title: step.title, docType: step.docType });
+          priorDocs.push({ title: step.title, content });
+          completedSteps.push(step.title);
+
+          await storage.updateProject(project.id, {
+            importStatus: {
+              state: "running",
+              source: `${snapshot.owner}/${snapshot.repo}`,
+              completedSteps: [...completedSteps],
+              totalSteps: DOC_PLAN.length,
+              currentStep: step.title,
+              startedAt: project.importStatus?.startedAt ?? new Date().toISOString(),
+            },
+          });
         }
 
-        await storage.createDocument({
-          projectId: project.id,
-          sessionId: null,
-          messageId: null,
-          title: step.title,
-          docType: step.docType,
-          content,
-          agentName: step.agentName,
-          phase: step.phase,
+        await storage.updateProject(project.id, {
+          importStatus: {
+            state: "completed",
+            source: `${snapshot.owner}/${snapshot.repo}`,
+            completedSteps: [...completedSteps],
+            totalSteps: DOC_PLAN.length,
+            startedAt: project.importStatus?.startedAt ?? new Date().toISOString(),
+            finishedAt: new Date().toISOString(),
+          },
         });
-
-        generatedDocs.push({ title: step.title, docType: step.docType });
-        priorDocs.push({ title: step.title, content });
+        console.log(`[import-github] completed for project ${project.id} (${snapshot.owner}/${snapshot.repo})`);
+      } catch (err: any) {
+        console.error(`[import-github] doc generation failed for project ${project.id}:`, err?.message);
+        await storage.updateProject(project.id, {
+          importStatus: {
+            state: "failed",
+            source: `${snapshot.owner}/${snapshot.repo}`,
+            completedSteps: [...completedSteps],
+            totalSteps: DOC_PLAN.length,
+            error: err?.message || "unknown error",
+            startedAt: project.importStatus?.startedAt ?? new Date().toISOString(),
+            finishedAt: new Date().toISOString(),
+          },
+        });
       }
-    } catch (err: any) {
-      console.error("[import-github] doc generation failed:", err?.message);
-      return res.status(500).json({
-        error: `Generated ${generatedDocs.length} of ${DOC_PLAN.length} documents before failure: ${err?.message || "unknown error"}`,
-        partial: true,
-        project,
-        projectId: project.id,
-        generated: generatedDocs,
-      });
-    }
-
-    if (generatedDocs.length !== DOC_PLAN.length) {
-      return res.status(500).json({
-        error: `Expected ${DOC_PLAN.length} documents but only ${generatedDocs.length} were created.`,
-        partial: true,
-        project,
-        projectId: project.id,
-        generated: generatedDocs,
-      });
-    }
-
-    res.status(201).json({
-      project,
-      repo: { owner: snapshot.owner, repo: snapshot.repo, url: snapshot.url, defaultBranch: snapshot.defaultBranch },
-      generated: generatedDocs,
-      message: `Created project "${project.name}" with ${generatedDocs.length} documents. Review each document and resolve the flagged issues with the agents.`,
+    })().catch((err) => {
+      console.error(`[import-github] background task crashed for project ${project.id}:`, err);
     });
   });
 

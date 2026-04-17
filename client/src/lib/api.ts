@@ -59,8 +59,9 @@ export class GithubImportError extends Error {
 
 export async function importGithubProject(repoUrl: string, intent?: string): Promise<{
   project: Project;
+  projectId: number;
   repo: { owner: string; repo: string; url: string; defaultBranch: string };
-  generated: { title: string; docType: string }[];
+  totalSteps: number;
   message: string;
 }> {
   const res = await fetch(`${API}/projects/import-github`, {
@@ -77,6 +78,27 @@ export async function importGithubProject(repoUrl: string, intent?: string): Pro
     });
   }
   return data;
+}
+
+export type ImportStatusResponse = {
+  projectId: number;
+  importStatus: {
+    state: "pending" | "running" | "completed" | "failed";
+    source?: string;
+    currentStep?: string;
+    completedSteps: string[];
+    totalSteps: number;
+    error?: string;
+    startedAt?: string;
+    finishedAt?: string;
+  } | null;
+  documentsCreated: { id: number; title: string; docType: string }[];
+};
+
+export async function fetchImportStatus(projectId: number): Promise<ImportStatusResponse> {
+  const res = await fetch(`${API}/projects/${projectId}/import-status`);
+  if (!res.ok) throw new Error("Failed to fetch import status");
+  return res.json();
 }
 
 export async function fetchProjectSessions(projectId: number): Promise<Session[]> {

@@ -26,6 +26,16 @@ export const projects = pgTable("projects", {
   description: text("description").notNull().default(""),
   status: text("status").notNull().default("active"),
   phase: text("phase").notNull().default("analysis"),
+  importStatus: jsonb("import_status").$type<{
+    state: "pending" | "running" | "completed" | "failed";
+    source?: string;
+    currentStep?: string;
+    completedSteps: string[];
+    totalSteps: number;
+    error?: string;
+    startedAt?: string;
+    finishedAt?: string;
+  }>(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });

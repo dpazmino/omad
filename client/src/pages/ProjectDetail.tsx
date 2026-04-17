@@ -5,13 +5,15 @@ import { Layout } from "@/components/layout/Layout";
 import {
   ArrowLeft, Send, Bot, User, Users, Plus, Loader2, MessageSquare,
   GitBranch, ArrowRight, ChevronDown, Trash2, FolderKanban, Command,
-  FileText, X, Download, PanelRightOpen, PanelRightClose, Eye, Code2
+  FileText, X, Download, PanelRightOpen, PanelRightClose, Eye, Code2,
+  CheckCircle2, AlertTriangle, Github
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   fetchAgents, fetchMessages, createSession, deleteSession,
   streamChat, fetchProjectSessions, updateProject, updateSession,
   fetchProjectDocuments, deleteDocument, scanProjectDocuments,
+  fetchImportStatus,
   type StreamEvent
 } from "@/lib/api";
 import type { Agent, ChatMessage, Session, Project, Document } from "@shared/schema";
@@ -139,6 +141,20 @@ export default function ProjectDetail() {
     queryKey: ["project-documents", projectId],
     queryFn: () => fetchProjectDocuments(projectId),
     refetchInterval: 5000,
+  });
+
+  const importInProgress =
+    project?.importStatus &&
+    (project.importStatus.state === "pending" || project.importStatus.state === "running");
+  const { data: importStatusData } = useQuery({
+    queryKey: ["import-status", projectId],
+    queryFn: () => fetchImportStatus(projectId),
+    enabled: !!project,
+    refetchInterval: (q) => {
+      const s = q.state.data?.importStatus?.state;
+      if (!s) return importInProgress ? 2500 : false;
+      return s === "completed" || s === "failed" ? false : 2500;
+    },
   });
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
@@ -359,6 +375,13 @@ export default function ProjectDetail() {
               <span className="text-xs text-muted-foreground hidden md:block">— {project.description}</span>
             )}
           </div>
+
+          {importStatusData?.importStatus && importStatusData.importStatus.state !== "completed" && (
+            <ImportProgressBanner
+              status={importStatusData.importStatus}
+              onDismiss={() => queryClient.invalidateQueries({ queryKey: ["project", projectId] })}
+            />
+          )}
 
           {/* Phase selector + tabs */}
           <div className="flex items-center justify-between gap-4">
@@ -1162,3 +1185,87 @@ function DocumentsPanel({
     </div>
   );
 }
+
+function ImportProgressBanner({
+  status,
+  onDismiss,
+}: {
+  status: { state: string; currentStep?: string; completedSteps: string[]; totalSteps: number; error?: string; source?: string };
+  onDismiss: () => void;
+}) {
+  const STEPS = ["Product Brief", "Product Requirements Document", "UX Design", "Architecture Document", "Epics & Stories"];
+  const completed = new Set(status.completedSteps ?? []);
+  const isFailed = status.state === "failed";
+  const completedCount = completed.size;
+  const totalSteps = status.totalSteps ?? STEPS.length;
+  const pct = Math.round((completedCount / totalSteps) * 100);
+
+  return (
+    <div
+      data-testid="banner-import-progress"
+      className={cn(
+        "mt-2 mb-1 px-3 py-2 rounded border text-xs",
+        isFailed ? "bg-destructive/5 border-destructive/30" : "bg-primary/5 border-primary/20"
+      )}
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <Github size={12} className={isFailed ? "text-destructive" : "text-primary"} />
+        <span className="font-medium text-foreground">
+          {isFailed ? "Import failed" : `Importing from GitHub`}
+        </span>
+        {status.source && <span className="font-mono text-muted-foreground">· {status.source}</span>}
+        <span className="text-muted-foreground ml-auto">
+          {completedCount} / {totalSteps} documents
+        </span>
+        <button
+          type="button"
+          data-testid="button-dismiss-import-banner"
+          onClick={onDismiss}
+          className="text-muted-foreground hover:text-foreground"
+          aria-label="Refresh"
+        >
+          <X size={11} />
+        </button>
+      </div>
+      <div className="h-1 bg-muted rounded overflow-hidden mb-1.5">
+        <div
+          className={cn("h-full transition-all duration-500", isFailed ? "bg-destructive" : "bg-primary")}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {STEPS.map((step) => {
+          const done = completed.has(step);
+          const active = status.currentStep === step && !done && !isFailed;
+          return (
+            <span
+              key={step}
+              className={cn(
+                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border",
+                done && "bg-primary/10 border-primary/30 text-foreground",
+                active && "bg-card border-primary/40 text-foreground",
+                !done && !active && "bg-card border-border text-muted-foreground"
+              )}
+            >
+              {done ? (
+                <CheckCircle2 size={9} className="text-primary" />
+              ) : active ? (
+                <Loader2 size={9} className="animate-spin text-primary" />
+              ) : (
+                <div className="w-2 h-2 rounded-full border border-border" />
+              )}
+              {step}
+            </span>
+          );
+        })}
+      </div>
+      {isFailed && status.error && (
+        <div className="mt-1.5 flex items-start gap-1.5 text-destructive">
+          <AlertTriangle size={11} className="mt-0.5 shrink-0" />
+          <span className="break-words">{status.error}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
