@@ -10,7 +10,8 @@ import {
   BookOpen,
   Shield,
   Brain,
-  Gauge
+  Gauge,
+  ClipboardCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/agents", label: "Agents", icon: Users },
   { href: "/workflows", label: "Workflows", icon: GitBranch },
   { href: "/guide", label: "Guide", icon: BookOpen },
+  { href: "/invest", label: "INVEST Analysis", icon: ClipboardCheck },
   { href: "/why-tools", label: "Why These Tools", icon: Brain },
 ];
 

@@ -12,6 +12,7 @@ import Guide from "@/pages/Guide";
 import DevView from "@/pages/DevView";
 import WhyTools from "@/pages/WhyTools";
 import TechDebt from "@/pages/TechDebt";
+import InvestAnalysis from "@/pages/InvestAnalysis";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/guide" component={Guide} />
       <Route path="/why-tools" component={WhyTools} />
       <Route path="/tech-debt" component={TechDebt} />
+      <Route path="/invest" component={InvestAnalysis} />
       <Route component={NotFound} />
     </Switch>
   );
