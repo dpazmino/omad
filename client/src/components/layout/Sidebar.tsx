@@ -9,13 +9,15 @@ import {
   FolderKanban,
   BookOpen,
   Shield,
-  Brain
+  Brain,
+  Gauge
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/", label: "Chat", icon: MessageSquare },
+  { href: "/tech-debt", label: "Tech Debt", icon: Gauge },
   { href: "/agents", label: "Agents", icon: Users },
   { href: "/workflows", label: "Workflows", icon: GitBranch },
   { href: "/guide", label: "Guide", icon: BookOpen },

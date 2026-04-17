@@ -1,4 +1,4 @@
-import type { Agent, Session, ChatMessage, Project, Document } from "@shared/schema";
+import type { Agent, Session, ChatMessage, Project, Document, TechDebtAssessment } from "@shared/schema";
 
 const API = "/api";
 
@@ -172,6 +172,29 @@ export async function deleteDocument(id: number): Promise<void> {
 export async function scanProjectDocuments(projectId: number): Promise<{ scanned: number; documents: Document[] }> {
   const res = await fetch(`${API}/projects/${projectId}/scan-documents`, { method: "POST" });
   if (!res.ok) throw new Error("Failed to scan documents");
+  return res.json();
+}
+
+export type PortfolioTechDebtItem = { project: Project; assessment: TechDebtAssessment | null };
+
+export async function fetchPortfolioTechDebt(): Promise<PortfolioTechDebtItem[]> {
+  const res = await fetch(`${API}/tech-debt/portfolio`);
+  if (!res.ok) throw new Error("Failed to fetch portfolio tech debt");
+  return res.json();
+}
+
+export async function fetchProjectTechDebt(projectId: number): Promise<TechDebtAssessment | null> {
+  const res = await fetch(`${API}/projects/${projectId}/tech-debt`);
+  if (!res.ok) throw new Error("Failed to fetch project tech debt");
+  return res.json();
+}
+
+export async function startTechDebtAssessment(projectId: number): Promise<{ assessmentId: number; projectId: number; totalAgents: number }> {
+  const res = await fetch(`${API}/projects/${projectId}/tech-debt/assess`, { method: "POST" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to start assessment");
+  }
   return res.json();
 }
 

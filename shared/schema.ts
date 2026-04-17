@@ -139,7 +139,51 @@ export const stories = pgTable("stories", {
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
+export const techDebtAssessments = pgTable("tech_debt_assessments", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  overallScore: integer("overall_score").notNull(),
+  tdr: integer("tdr").notNull(),
+  grade: text("grade").notNull(),
+  remediationDays: integer("remediation_days").notNull(),
+  cultureScore: integer("culture_score").notNull(),
+  categoryScores: jsonb("category_scores").$type<{
+    code: number;
+    security: number;
+    tests: number;
+    documentation: number;
+    architecture: number;
+    dependencies: number;
+    operations: number;
+  }>().notNull(),
+  findings: jsonb("findings").$type<{
+    id: string;
+    category: string;
+    severity: "critical" | "high" | "medium" | "low";
+    title: string;
+    description: string;
+    remediationDays: number;
+    agent: string;
+  }[]>().default([]),
+  reductionPlan: jsonb("reduction_plan").$type<{
+    summary: string;
+    phases: { name: string; durationWeeks: number; goals: string[]; expectedScoreLift: number }[];
+  }>(),
+  cultureNotes: text("culture_notes").notNull().default(""),
+  status: jsonb("status").$type<{
+    state: "pending" | "running" | "completed" | "failed";
+    currentAgent?: string;
+    completedAgents: string[];
+    totalAgents: number;
+    error?: string;
+  }>(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
 export const insertAgentSchema = createInsertSchema(agents).omit({ id: true, createdAt: true });
+export const insertTechDebtAssessmentSchema = createInsertSchema(techDebtAssessments).omit({ id: true, createdAt: true });
+export type TechDebtAssessment = typeof techDebtAssessments.$inferSelect;
+export type InsertTechDebtAssessment = z.infer<typeof insertTechDebtAssessmentSchema>;
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: true, createdAt: true, updatedAt: true });

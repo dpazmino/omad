@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { agents, sessions, messages, workflows, projects, documents, epics, sprints, stories, type Agent, type InsertAgent, type Session, type InsertSession, type ChatMessage, type InsertMessage, type Workflow, type InsertWorkflow, type Project, type InsertProject, type Document, type InsertDocument, type Epic, type InsertEpic, type Sprint, type InsertSprint, type Story, type InsertStory } from "@shared/schema";
+import { agents, sessions, messages, workflows, projects, documents, epics, sprints, stories, techDebtAssessments, type Agent, type InsertAgent, type Session, type InsertSession, type ChatMessage, type InsertMessage, type Workflow, type InsertWorkflow, type Project, type InsertProject, type Document, type InsertDocument, type Epic, type InsertEpic, type Sprint, type InsertSprint, type Story, type InsertStory, type TechDebtAssessment, type InsertTechDebtAssessment } from "@shared/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 
 export interface IStorage {
@@ -55,6 +55,12 @@ export interface IStorage {
   createStory(story: InsertStory): Promise<Story>;
   updateStory(id: number, data: Partial<InsertStory>): Promise<Story>;
   deleteStory(id: number): Promise<void>;
+
+  getTechDebtAssessments(): Promise<TechDebtAssessment[]>;
+  getLatestTechDebtAssessment(projectId: number): Promise<TechDebtAssessment | undefined>;
+  getTechDebtAssessment(id: number): Promise<TechDebtAssessment | undefined>;
+  createTechDebtAssessment(assessment: InsertTechDebtAssessment): Promise<TechDebtAssessment>;
+  updateTechDebtAssessment(id: number, data: Partial<InsertTechDebtAssessment>): Promise<TechDebtAssessment>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -266,6 +272,33 @@ class DatabaseStorage implements IStorage {
 
   async deleteStory(id: number): Promise<void> {
     await db.delete(stories).where(eq(stories.id, id));
+  }
+
+  async getTechDebtAssessments(): Promise<TechDebtAssessment[]> {
+    return db.select().from(techDebtAssessments).orderBy(desc(techDebtAssessments.createdAt));
+  }
+
+  async getLatestTechDebtAssessment(projectId: number): Promise<TechDebtAssessment | undefined> {
+    const [latest] = await db.select().from(techDebtAssessments)
+      .where(eq(techDebtAssessments.projectId, projectId))
+      .orderBy(desc(techDebtAssessments.createdAt))
+      .limit(1);
+    return latest;
+  }
+
+  async getTechDebtAssessment(id: number): Promise<TechDebtAssessment | undefined> {
+    const [a] = await db.select().from(techDebtAssessments).where(eq(techDebtAssessments.id, id));
+    return a;
+  }
+
+  async createTechDebtAssessment(assessment: InsertTechDebtAssessment): Promise<TechDebtAssessment> {
+    const [created] = await db.insert(techDebtAssessments).values(assessment).returning();
+    return created;
+  }
+
+  async updateTechDebtAssessment(id: number, data: Partial<InsertTechDebtAssessment>): Promise<TechDebtAssessment> {
+    const [updated] = await db.update(techDebtAssessments).set(data).where(eq(techDebtAssessments.id, id)).returning();
+    return updated;
   }
 }
 

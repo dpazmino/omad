@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { BMAD_AGENTS, buildSystemPrompt } from "./agents";
+import { TECH_DEBT_AGENTS, gradeForScore, type CategoryScores } from "./techDebtAgents";
 import { parseRepoUrl, fetchRepoSnapshot, buildRepoContextBlock, PrivateRepoError, type RepoSnapshot } from "./github";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -134,14 +135,15 @@ async function detectAndSaveDocument(
 
 async function seedAgents() {
   const existing = await storage.getAgents();
+  const allAgents = [...BMAD_AGENTS, ...TECH_DEBT_AGENTS];
   if (existing.length === 0) {
-    for (const agent of BMAD_AGENTS) {
+    for (const agent of allAgents) {
       await storage.createAgent(agent);
     }
-    console.log(`Seeded ${BMAD_AGENTS.length} BMad agents`);
+    console.log(`Seeded ${allAgents.length} agents (${BMAD_AGENTS.length} BMad + ${TECH_DEBT_AGENTS.length} tech-debt)`);
   } else {
     const existingNames = new Set(existing.map(a => a.name));
-    for (const agent of BMAD_AGENTS) {
+    for (const agent of allAgents) {
       if (!existingNames.has(agent.name)) {
         await storage.createAgent(agent);
         console.log(`Seeded new agent: ${agent.name}`);
@@ -1619,6 +1621,255 @@ List numbered questions the user should resolve (ambiguous requirements, missing
       }
     })().catch((err) => {
       console.error(`[import-github] background task crashed for project ${project.id}:`, err);
+    });
+  });
+
+  // ── Technical Debt ──
+  app.get("/api/tech-debt/portfolio", async (_req, res) => {
+    const projects = await storage.getProjects();
+    const items = await Promise.all(projects.map(async (p) => {
+      const latest = await storage.getLatestTechDebtAssessment(p.id);
+      return { project: p, assessment: latest || null };
+    }));
+    res.json(items);
+  });
+
+  app.get("/api/projects/:id/tech-debt", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const latest = await storage.getLatestTechDebtAssessment(projectId);
+    res.json(latest || null);
+  });
+
+  app.post("/api/projects/:id/tech-debt/assess", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    const [docs, epics, stories] = await Promise.all([
+      storage.getDocumentsByProject(projectId),
+      storage.getEpicsByProject(projectId),
+      storage.getStoriesByProject(projectId),
+    ]);
+
+    const totalAgents = TECH_DEBT_AGENTS.length;
+    const initial = await storage.createTechDebtAssessment({
+      projectId,
+      overallScore: 0,
+      tdr: 0,
+      grade: "—",
+      remediationDays: 0,
+      cultureScore: 0,
+      categoryScores: { code: 0, security: 0, tests: 0, documentation: 0, architecture: 0, dependencies: 0, operations: 0 },
+      findings: [],
+      reductionPlan: null,
+      cultureNotes: "",
+      status: {
+        state: "running",
+        currentAgent: TECH_DEBT_AGENTS[1].name,
+        completedAgents: [],
+        totalAgents,
+      },
+    });
+
+    res.status(202).json({ assessmentId: initial.id, projectId, totalAgents });
+
+    (async () => {
+      const projectContext = `Project: ${project.name}
+Phase: ${project.phase}
+Description: ${project.description || "(none)"}
+
+DOCUMENTS (${docs.length}):
+${docs.map(d => `- [${d.docType}] ${d.title}\n  ${d.content.slice(0, 1500).replace(/\s+/g, " ")}${d.content.length > 1500 ? "…" : ""}`).join("\n") || "(none)"}
+
+EPICS (${epics.length}):
+${epics.map(e => `- ${e.title} [${e.status}]: ${e.description.slice(0, 200)}`).join("\n") || "(none)"}
+
+STORIES (${stories.length}):
+${stories.slice(0, 30).map(s => `- ${s.title} [${s.status}, ${s.priority}, ${s.storyPoints || "?"}pt]`).join("\n") || "(none)"}${stories.length > 30 ? `\n…and ${stories.length - 30} more` : ""}`;
+
+      const completedAgents: string[] = [];
+      const allFindings: any[] = [];
+      const categoryScores: CategoryScores = {
+        code: 0, security: 0, tests: 0, documentation: 0, architecture: 0, dependencies: 0, operations: 75,
+      };
+
+      const SPECIALISTS = TECH_DEBT_AGENTS.filter(a => a.name !== "Otto");
+      const CATEGORY_BY_AGENT: Record<string, keyof CategoryScores> = {
+        Vera: "code", Cyrus: "security", Tara: "tests",
+        Diana: "documentation", Marcus: "architecture", Nora: "dependencies",
+      };
+
+      try {
+        for (const agent of SPECIALISTS) {
+          await storage.updateTechDebtAssessment(initial.id, {
+            status: { state: "running", currentAgent: agent.name, completedAgents: [...completedAgents], totalAgents },
+          });
+
+          const systemPrompt = `You are ${agent.name}, ${agent.title}. ${agent.identity}
+
+Communication style: ${agent.communicationStyle}
+Principles: ${agent.principles}
+
+You are assessing a project for technical debt in your specialty area. Be specific, evidence-based, and concise. This is for a regulated banking environment — no hype, no filler.
+
+Return your analysis ONLY as a single JSON object with this shape:
+{
+  "categoryScore": <integer 0-100, where 100 is debt-free and 0 is critical>,
+  "summary": "<1-2 sentence verdict>",
+  "findings": [
+    {
+      "severity": "critical" | "high" | "medium" | "low",
+      "title": "<short headline>",
+      "description": "<2-3 sentences of specific evidence and impact>",
+      "remediationDays": <integer estimate of engineer-days to fix>
+    }
+  ]
+}
+
+Produce 2-5 findings. Focus on what is actually visible in the project context. If the project is sparse on data, infer reasonable defaults for an early-stage project but say so in the description.`;
+
+          const response = await anthropic.messages.create({
+            model: "claude-sonnet-4-6",
+            max_tokens: 2500,
+            temperature: 0.2,
+            system: systemPrompt,
+            messages: [{ role: "user", content: `Assess technical debt for the following project from your ${agent.title} perspective.\n\n${projectContext}` }],
+          });
+
+          const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+          const match = text.match(/\{[\s\S]*\}/);
+          if (match) {
+            try {
+              const parsed = JSON.parse(match[0]);
+              const cat = CATEGORY_BY_AGENT[agent.name];
+              if (cat && typeof parsed.categoryScore === "number") {
+                categoryScores[cat] = Math.max(0, Math.min(100, Math.round(parsed.categoryScore)));
+              }
+              if (Array.isArray(parsed.findings)) {
+                for (const f of parsed.findings) {
+                  allFindings.push({
+                    id: `${agent.name}-${allFindings.length + 1}`,
+                    category: cat || "general",
+                    severity: f.severity || "medium",
+                    title: f.title || "Finding",
+                    description: f.description || "",
+                    remediationDays: typeof f.remediationDays === "number" ? f.remediationDays : 1,
+                    agent: agent.name,
+                  });
+                }
+              }
+            } catch (parseErr) {
+              console.error(`[tech-debt] parse failed for ${agent.name}:`, parseErr);
+            }
+          }
+          completedAgents.push(agent.name);
+        }
+
+        // Otto synthesizes
+        await storage.updateTechDebtAssessment(initial.id, {
+          status: { state: "running", currentAgent: "Otto", completedAgents: [...completedAgents], totalAgents },
+        });
+
+        const overallScore = Math.round(
+          (categoryScores.code + categoryScores.security + categoryScores.tests +
+           categoryScores.documentation + categoryScores.architecture +
+           categoryScores.dependencies + categoryScores.operations) / 7
+        );
+        const totalRemediationDays = allFindings.reduce((sum, f) => sum + (f.remediationDays || 0), 0);
+        const developmentDays = Math.max(60, (epics.length * 20) + (stories.length * 3) + (docs.length * 2));
+        const tdr = Math.round((totalRemediationDays / developmentDays) * 100);
+
+        const findingsSummary = allFindings.map(f =>
+          `[${f.severity.toUpperCase()}] (${f.category}, ${f.agent}) ${f.title} — ${f.description} (~${f.remediationDays}d)`
+        ).join("\n");
+
+        const ottoSystem = `You are Otto, ${TECH_DEBT_AGENTS[0].title}. ${TECH_DEBT_AGENTS[0].identity}
+
+Style: ${TECH_DEBT_AGENTS[0].communicationStyle}
+Principles: ${TECH_DEBT_AGENTS[0].principles}
+
+You receive findings from 6 specialist auditors and must synthesize an executive verdict and a phased Debt Reduction Plan for a banking organization.
+
+Return ONLY a JSON object with this shape:
+{
+  "cultureScore": <integer 0-100, the team's Culture of Excellence indicator inferred from documentation depth, story quality, test coverage signals, and overall craft>,
+  "cultureNotes": "<2-3 sentences on culture of excellence indicators>",
+  "reductionPlan": {
+    "summary": "<2-3 sentence executive summary tying TDR (${tdr}%), top risks, and the recommended path forward. Reference TDR target of <5%.>",
+    "phases": [
+      { "name": "<phase name, e.g. 'Stabilize: Critical & High'>", "durationWeeks": <integer>, "goals": ["<goal>", "<goal>"], "expectedScoreLift": <integer points the overall score should rise by> },
+      { "name": "<phase 2>", "durationWeeks": <integer>, "goals": ["<goal>"], "expectedScoreLift": <integer> },
+      { "name": "<phase 3>", "durationWeeks": <integer>, "goals": ["<goal>"], "expectedScoreLift": <integer> }
+    ]
+  }
+}`;
+
+        const ottoUser = `PROJECT: ${project.name}
+Overall TDS: ${overallScore}/100 (Grade ${gradeForScore(overallScore)})
+Technical Debt Ratio: ${tdr}% (target <5%, banking healthy <10%)
+Total remediation effort: ${totalRemediationDays} engineer-days
+Estimated dev effort to date: ${developmentDays} engineer-days
+
+Category scores:
+- Code Quality: ${categoryScores.code}
+- Security: ${categoryScores.security}
+- Test Coverage: ${categoryScores.tests}
+- Documentation: ${categoryScores.documentation}
+- Architecture: ${categoryScores.architecture}
+- Dependencies: ${categoryScores.dependencies}
+- Operations: ${categoryScores.operations}
+
+ALL FINDINGS:
+${findingsSummary || "(no findings collected)"}
+
+Synthesize a Culture of Excellence score and a 3-phase Debt Reduction Plan.`;
+
+        const ottoResp = await anthropic.messages.create({
+          model: "claude-sonnet-4-6",
+          max_tokens: 2500,
+          temperature: 0.2,
+          system: ottoSystem,
+          messages: [{ role: "user", content: ottoUser }],
+        });
+
+        const ottoText = ottoResp.content[0]?.type === "text" ? ottoResp.content[0].text : "";
+        const ottoMatch = ottoText.match(/\{[\s\S]*\}/);
+        let cultureScore = Math.max(40, Math.min(95, overallScore));
+        let cultureNotes = "Culture indicators inferred from artifact depth and craft signals.";
+        let reductionPlan: any = null;
+        if (ottoMatch) {
+          try {
+            const parsed = JSON.parse(ottoMatch[0]);
+            if (typeof parsed.cultureScore === "number") cultureScore = Math.max(0, Math.min(100, Math.round(parsed.cultureScore)));
+            if (typeof parsed.cultureNotes === "string") cultureNotes = parsed.cultureNotes;
+            if (parsed.reductionPlan) reductionPlan = parsed.reductionPlan;
+          } catch (e) {
+            console.error(`[tech-debt] otto parse failed:`, e);
+          }
+        }
+        completedAgents.push("Otto");
+
+        await storage.updateTechDebtAssessment(initial.id, {
+          overallScore,
+          tdr,
+          grade: gradeForScore(overallScore),
+          remediationDays: totalRemediationDays,
+          cultureScore,
+          categoryScores,
+          findings: allFindings,
+          reductionPlan,
+          cultureNotes,
+          status: { state: "completed", completedAgents, totalAgents },
+        });
+        console.log(`[tech-debt] completed assessment ${initial.id} for project ${projectId} (TDS=${overallScore}, TDR=${tdr}%)`);
+      } catch (err: any) {
+        console.error(`[tech-debt] failed for project ${projectId}:`, err?.message);
+        await storage.updateTechDebtAssessment(initial.id, {
+          status: { state: "failed", completedAgents, totalAgents, error: err?.message || "unknown error" },
+        });
+      }
+    })().catch((err) => {
+      console.error(`[tech-debt] background task crashed for project ${projectId}:`, err);
     });
   });
 
