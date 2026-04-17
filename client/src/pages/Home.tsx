@@ -69,7 +69,20 @@ export default function Home() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isStreaming || !activeSessionId) return;
+    if (!input.trim() || isStreaming) return;
+
+    let sessionId = activeSessionId;
+    if (!sessionId) {
+      try {
+        const session = await createSession();
+        sessionId = session.id;
+        setActiveSessionId(session.id);
+        queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      } catch (err) {
+        console.error("Failed to create session:", err);
+        return;
+      }
+    }
 
     const userContent = input.trim();
     setInput("");
@@ -80,7 +93,7 @@ export default function Home() {
 
     try {
       if (partyMode) {
-        await streamChat(activeSessionId, userContent, null, true, (event: StreamEvent) => {
+        await streamChat(sessionId, userContent, null, true, (event: StreamEvent) => {
           switch (event.type) {
             case "agent_start":
               setPartyResponses(prev => [...prev, { agentName: event.agentName, content: "", done: false }]);
