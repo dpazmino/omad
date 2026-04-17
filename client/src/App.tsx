@@ -10,6 +10,7 @@ import Projects from "@/pages/Projects";
 import ProjectDetail from "@/pages/ProjectDetail";
 import Guide from "@/pages/Guide";
 import DevView from "@/pages/DevView";
+import WhyTools from "@/pages/WhyTools";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/agents" component={Agents} />
       <Route path="/workflows" component={Workflows} />
       <Route path="/guide" component={Guide} />
+      <Route path="/why-tools" component={WhyTools} />
       <Route component={NotFound} />
     </Switch>
   );
